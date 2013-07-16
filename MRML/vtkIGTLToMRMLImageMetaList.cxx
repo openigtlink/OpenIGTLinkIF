@@ -60,7 +60,7 @@ vtkMRMLNode* vtkIGTLToMRMLImageMetaList::CreateNewNode(vtkMRMLScene* scene, cons
   imetaNode->SetDescription("Received by OpenIGTLink");
 
   scene->AddNode(imetaNode);
-
+  imetaNode->Delete();
   return imetaNode;
 }
 
