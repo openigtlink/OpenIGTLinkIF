@@ -71,6 +71,7 @@ vtkMRMLIGTLConnectorNode::vtkMRMLIGTLConnectorNode()
   this->Type   = TYPE_NOT_DEFINED;
   this->State  = STATE_OFF;
   this->Persistent = PERSISTENT_OFF;
+  this->LogErrorIfServerConnectionFailed = true;
 
   this->Thread = vtkMultiThreader::New();
   this->ServerStopFlag = false;
@@ -256,6 +257,12 @@ void vtkMRMLIGTLConnectorNode::ReadXMLAttributes(const char** atts)
       std::stringstream ss;
       ss << attValue;
       ss >> state;
+      }
+    if (!strcmp(attName, "logErrorIfServerConnectionFailed"))
+      {
+      std::stringstream ss;
+      ss << attValue;
+      ss >> LogErrorIfServerConnectionFailed;
       }
     }
 
@@ -739,7 +746,7 @@ int vtkMRMLIGTLConnectorNode::WaitForConnection()
     else if (this->Type == TYPE_CLIENT) // if this->Type == TYPE_CLIENT
       {
       //vtkErrorMacro("vtkMRMLIGTLConnectorNode: Connecting to server...");
-      int r = this->Socket->ConnectToServer(this->ServerHostname.c_str(), this->ServerPort);
+      int r = this->Socket->ConnectToServer(this->ServerHostname.c_str(), this->ServerPort, this->LogErrorIfServerConnectionFailed);
       if (r == 0) // if connected to server
         {
         return 1;
