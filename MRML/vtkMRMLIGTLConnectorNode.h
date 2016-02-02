@@ -176,6 +176,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   vtkGetMacro( State, int );
   vtkSetMacro( RestrictDeviceName, int );
   vtkGetMacro( RestrictDeviceName, int );
+  vtkSetMacro( LogErrorIfServerConnectionFailed, bool);
+  vtkGetMacro( LogErrorIfServerConnectionFailed, bool);
 
   // Controls if active connection will be resumed when
   // scene is loaded (cf: PERSISTENT_ON/_OFF)
@@ -360,6 +362,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   int Type;
   int State;
   int Persistent;
+  bool LogErrorIfServerConnectionFailed;
 
   //----------------------------------------------------------------
   // Thread and Socket
