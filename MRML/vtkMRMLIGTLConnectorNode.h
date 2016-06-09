@@ -145,6 +145,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   // method to propagate events generated in mrml
   virtual void ProcessMRMLEvents ( vtkObject *caller, unsigned long event, void *callData );
 
+#ifndef __VTK_WRAP__
   //BTX
   virtual void OnNodeReferenceAdded(vtkMRMLNodeReference *reference);
 
@@ -152,6 +153,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
 
   virtual void OnNodeReferenceModified(vtkMRMLNodeReference *reference);
   //ETX
+#endif // __VTK_WRAP__
 
  protected:
   //----------------------------------------------------------------
