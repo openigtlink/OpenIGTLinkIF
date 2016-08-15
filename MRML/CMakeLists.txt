@@ -21,7 +21,7 @@ set(${KIT}_SRCS
   vtkMRMLIGTLStatusNode.cxx
   )
 
-if(OpenIGTLink_PROTOCOL_VERSION EQUAL 2)
+if(OpenIGTLink_PROTOCOL_VERSION GREATER 1)
   list(APPEND ${KIT}_SRCS
     vtkMRMLIGTLQueryNode.cxx
     vtkMRMLImageMetaListNode.cxx
