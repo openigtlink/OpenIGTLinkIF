@@ -28,6 +28,7 @@
 // MRML includes
 #include <vtkMRMLScalarVolumeNode.h>
 #include <vtkMRMLScalarVolumeDisplayNode.h>
+#include <vtkMRMLVectorVolumeNode.h>
 #include <vtkMRMLVectorVolumeDisplayNode.h>
 
 // VTK includes
@@ -162,8 +163,15 @@ vtkMRMLNode* vtkIGTLToMRMLImage::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
     image->Update();
 #endif
     }
-
-  vtkSmartPointer<vtkMRMLVolumeNode> volumeNode = vtkSmartPointer<vtkMRMLScalarVolumeNode>::New();
+  vtkSmartPointer<vtkMRMLVolumeNode> volumeNode;
+  if (numberOfComponents == 1)
+  {
+    volumeNode = vtkSmartPointer<vtkMRMLScalarVolumeNode>::New();
+  }
+  else if (numberOfComponents > 1)
+  {
+    volumeNode = vtkSmartPointer<vtkMRMLVectorVolumeNode>::New();
+  }
   volumeNode->SetAndObserveImageData(image);
   volumeNode->SetName(name);
 
@@ -249,13 +257,6 @@ int swapCopy64(igtlUint64 * dst, igtlUint64 * src, int n)
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
 {
-  vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(node);
-  if (volumeNode==NULL)
-    {
-    vtkErrorMacro("vtkIGTLToMRMLImage::IGTLToMRML failed: invalid node");
-    return 0;
-    }
-
   // Create a message buffer to receive image data
   igtl::ImageMessage::Pointer imgMsg;
   imgMsg = igtl::ImageMessage::New();
@@ -288,8 +289,23 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   numComponents = imgMsg->GetNumComponents();
   imgMsg->GetSubVolume(svsize, svoffset);
   imgMsg->GetMatrix(matrix);
+  
+  vtkMRMLVolumeNode* volumeNode;
+  if (numComponents == 1)
+  {
+    volumeNode = vtkMRMLScalarVolumeNode::SafeDownCast(node);
+  }
+  else
+  {
+    volumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
+  }
+  if (volumeNode==NULL)
+  {
+    vtkErrorMacro("vtkIGTLToMRMLImage::IGTLToMRML failed: invalid node");
+    return 0;
+  }
 
-  // check if the IGTL data fits to the current MRML node  
+  // check if the IGTL data fits to the current MRML node
   int sizeInNode[3]={0,0,0};
   int scalarTypeInNode=VTK_VOID;
   int numComponentsInNode=0;
@@ -566,8 +582,8 @@ int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
   // If mrmlNode is Image node
   if (event == vtkMRMLVolumeNode::ImageDataModifiedEvent && strcmp(mrmlNode->GetNodeTagName(), "Volume") == 0)
     {
-    vtkMRMLScalarVolumeNode* volumeNode =
-      vtkMRMLScalarVolumeNode::SafeDownCast(mrmlNode);
+    vtkMRMLVolumeNode* volumeNode =
+      vtkMRMLVolumeNode::SafeDownCast(mrmlNode);
 
     if (!volumeNode)
       {
