@@ -247,19 +247,13 @@ int swapCopy64(igtlUint64 * dst, igtlUint64 * src, int n)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer buffer)
 {
-  vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(node);
-  if (volumeNode==NULL)
+  if (this->InImageMessage.IsNull())
     {
-    vtkErrorMacro("vtkIGTLToMRMLImage::IGTLToMRML failed: invalid node");
-    return 0;
+    this->InImageMessage = igtl::ImageMessage::New();
     }
-
-  // Create a message buffer to receive image data
-  igtl::ImageMessage::Pointer imgMsg;
-  imgMsg = igtl::ImageMessage::New();
-  imgMsg->Copy(buffer); // !! TODO: copy makes performance issue.
+  this->InImageMessage->Copy(buffer);
 
   // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.
@@ -268,6 +262,19 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
     // TODO: error handling
+    return 0;
+    }
+
+}
+
+
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+{
+  vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(node);
+  if (volumeNode==NULL)
+    {
+    vtkErrorMacro("vtkIGTLToMRMLImage::IGTLToMRML failed: invalid node");
     return 0;
     }
 
