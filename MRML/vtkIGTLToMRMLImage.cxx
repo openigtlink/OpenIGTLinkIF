@@ -255,20 +255,34 @@ int swapCopy64(igtlUint64 * dst, igtlUint64 * src, int n)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer buffer)
 {
-  // Create a message buffer to receive image data
-  igtl::ImageMessage::Pointer imgMsg;
-  imgMsg = igtl::ImageMessage::New();
-  imgMsg->Copy(buffer); // !! TODO: copy makes performance issue.
+  if (this->InImageMessage.IsNull())
+    {
+    this->InImageMessage = igtl::ImageMessage::New();
+    }
+  this->InImageMessage->Copy(buffer);
 
   // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.
-  int c = imgMsg->Unpack(this->CheckCRC);
+  int c = this->InImageMessage->Unpack(this->CheckCRC);
 
   if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
     // TODO: error handling
+    return 0;
+    }
+  return 1;
+}
+
+
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+{
+  vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(node);
+  if (volumeNode==NULL)
+    {
+    vtkErrorMacro("vtkIGTLToMRMLImage::IGTLToMRML failed: invalid node");
     return 0;
     }
 
@@ -282,28 +296,13 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   int   endian;
   igtl::Matrix4x4 matrix; // Image origin and orientation matrix
 
-  scalarType = IGTLToVTKScalarType( imgMsg->GetScalarType() );
-  endian = imgMsg->GetEndian();
-  imgMsg->GetDimensions(size);
-  imgMsg->GetSpacing(spacing);
-  numComponents = imgMsg->GetNumComponents();
-  imgMsg->GetSubVolume(svsize, svoffset);
-  imgMsg->GetMatrix(matrix);
-  
-  vtkMRMLVolumeNode* volumeNode;
-  if (numComponents == 1)
-  {
-    volumeNode = vtkMRMLScalarVolumeNode::SafeDownCast(node);
-  }
-  else
-  {
-    volumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
-  }
-  if (volumeNode==NULL)
-  {
-    vtkErrorMacro("vtkIGTLToMRMLImage::IGTLToMRML failed: invalid node");
-    return 0;
-  }
+  scalarType = IGTLToVTKScalarType( this->InImageMessage->GetScalarType() );
+  endian = this->InImageMessage->GetEndian();
+  this->InImageMessage->GetDimensions(size);
+  this->InImageMessage->GetSpacing(spacing);
+  numComponents = this->InImageMessage->GetNumComponents();
+  this->InImageMessage->GetSubVolume(svsize, svoffset);
+  this->InImageMessage->GetMatrix(matrix);
 
   // check if the IGTL data fits to the current MRML node
   int sizeInNode[3]={0,0,0};
@@ -386,7 +385,7 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   float pz = matrix[2][3];
 
   // Check scalar size
-  int scalarSize = imgMsg->GetScalarSize();
+  int scalarSize = this->InImageMessage->GetScalarSize();
   
   int fByteSwap = 0;
   // Check if bytes-swap is required
@@ -398,7 +397,7 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
     fByteSwap = 1;
     }
 
-  if (imgMsg->GetImageSize() == imgMsg->GetSubVolumeImageSize())
+  if (this->InImageMessage->GetImageSize() == this->InImageMessage->GetSubVolumeImageSize())
     {
     // In case that volume size == sub-volume size,
     // image is read directly to the memory area of vtkImageData
@@ -409,18 +408,18 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
         {
         case 2:
           swapCopy16((igtlUint16 *)imageData->GetScalarPointer(),
-                     (igtlUint16 *)imgMsg->GetScalarPointer(),
-                     imgMsg->GetSubVolumeImageSize() / 2);
+                     (igtlUint16 *)this->InImageMessage->GetScalarPointer(),
+                     this->InImageMessage->GetSubVolumeImageSize() / 2);
           break;
         case 4:
           swapCopy32((igtlUint32 *)imageData->GetScalarPointer(),
-                     (igtlUint32 *)imgMsg->GetScalarPointer(),
-                     imgMsg->GetSubVolumeImageSize() / 4);
+                     (igtlUint32 *)this->InImageMessage->GetScalarPointer(),
+                     this->InImageMessage->GetSubVolumeImageSize() / 4);
           break;
         case 8:
           swapCopy64((igtlUint64 *)imageData->GetScalarPointer(),
-                     (igtlUint64 *)imgMsg->GetScalarPointer(),
-                     imgMsg->GetSubVolumeImageSize() / 8);
+                     (igtlUint64 *)this->InImageMessage->GetScalarPointer(),
+                     this->InImageMessage->GetSubVolumeImageSize() / 8);
           break;
         default:
           break;
@@ -429,7 +428,7 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
     else
       {
       memcpy(imageData->GetScalarPointer(),
-             imgMsg->GetScalarPointer(), imgMsg->GetSubVolumeImageSize());
+             this->InImageMessage->GetScalarPointer(), this->InImageMessage->GetSubVolumeImageSize());
       }
     }
   else
@@ -438,7 +437,7 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
     // image is loaded into ImageReadBuffer, then copied to
     // the memory area of vtkImageData.
     char* imgPtr = (char*) imageData->GetScalarPointer();
-    char* bufPtr = (char*) imgMsg->GetScalarPointer();
+    char* bufPtr = (char*) this->InImageMessage->GetScalarPointer();
     int sizei = size[0];
     int sizej = size[1];
     //int sizek = size[2];
