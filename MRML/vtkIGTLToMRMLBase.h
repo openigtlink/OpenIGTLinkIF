@@ -62,7 +62,19 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // IGTL Device / MRML Tag names
   virtual const char*  GetIGTLName()      { return NULL;};
   virtual const char*  GetMRMLName()      { return NULL;};
-  virtual std::vector<std::string>  GetAllMRMLNames() { this->MRMLNames.push_back(GetMRMLName()); return this->MRMLNames;}
+  virtual std::vector<std::string>  GetAllMRMLNames()
+  {
+    if(this->MRMLNames.size() == 0)
+    {
+      if(GetMRMLName())
+      {
+        this->MRMLNames.push_back(GetMRMLName());
+      }
+    }
+    return this->MRMLNames;
+  }
+  virtual unsigned int GetNumOfMRMLName(){GetAllMRMLNames();return this->MRMLNames.size();};
+  virtual const char*  GetMRMLNameAtIndex(unsigned int index) { GetAllMRMLNames(); if(index < this->MRMLNames.size()) return this->MRMLNames[index].c_str(); return NULL;};
 
   // Following functions are implemented only if exists in OpenIGTLink specification
   virtual const char*  GetIGTLStartQueryName() { return NULL; };
