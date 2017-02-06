@@ -62,6 +62,19 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // IGTL Device / MRML Tag names
   virtual const char*  GetIGTLName()      { return NULL;};
   virtual const char*  GetMRMLName()      { return NULL;};
+  virtual std::vector<std::string>  GetAllMRMLNames()
+  {
+    if(this->MRMLNames.size() == 0)
+    {
+      if(GetMRMLName())
+      {
+        this->MRMLNames.push_back(GetMRMLName());
+      }
+    }
+    return this->MRMLNames;
+  }
+  virtual unsigned int GetNumOfMRMLName(){GetAllMRMLNames();return this->MRMLNames.size();};
+  virtual const char*  GetMRMLNameAtIndex(unsigned int index) { GetAllMRMLNames(); if(index < this->MRMLNames.size()) return this->MRMLNames[index].c_str(); return NULL;};
 
   // Following functions are implemented only if exists in OpenIGTLink specification
   virtual const char*  GetIGTLStartQueryName() { return NULL; };
@@ -84,6 +97,11 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // for TYPE_MULTI_IGTL_NAMES
   int                  GetNumberOfIGTLNames()   { return this->IGTLNames.size(); };
   const char*          GetIGTLName(int index)   { return this->IGTLNames[index].c_str(); };
+
+  // Description:
+  // Functions to de-serialize (unpack) the OpenIGTLink message and store in the class instance.
+  // The de-serialized message must be deleted in IGTLToMRML()
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer) { return 1; };
 
   // Description:
   // Functions to convert OpenIGTLink message to MRML node.
@@ -124,6 +142,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
 
   // list of IGTL names (used only when the class supports multiple IGTL names)
   std::vector<std::string>  IGTLNames;
+  
+  std::vector<std::string>  MRMLNames;
 
   int CheckCRC;
 

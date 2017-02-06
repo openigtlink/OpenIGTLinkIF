@@ -40,13 +40,30 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLImage : public vt
   void PrintSelf(ostream& os, vtkIndent indent);
 
   virtual const char*  GetIGTLName() { return "IMAGE"; };
-  virtual const char*  GetMRMLName() { return "Volume"; };
+  virtual const char*  GetMRMLName()
+  {
+    if(this->InImageMessage.IsNotNull())
+    {
+      if(this->InImageMessage->GetNumComponents()>1)
+      {
+        return "VectorVolume";
+      }
+    }
+    return "Volume";
+  };
   virtual vtkIntArray* GetNodeEvents();
   virtual vtkMRMLNode* CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer incomingImageMessage);
 
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer);
   virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node);
   virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg);
-
+  virtual std::vector<std::string>  GetAllMRMLNames()
+  {
+    this->MRMLNames.clear();
+    this->MRMLNames.push_back("VectorVolume");
+    this->MRMLNames.push_back("Volume");
+    return this->MRMLNames;
+  }
 
  protected:
   vtkIGTLToMRMLImage();
@@ -57,6 +74,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLImage : public vt
   int IGTLToVTKScalarType(int igtlType);
 
  protected:
+  igtl::ImageMessage::Pointer InImageMessage;
   igtl::ImageMessage::Pointer OutImageMessage;
 
   igtl::GetImageMessage::Pointer GetImageMessage;
