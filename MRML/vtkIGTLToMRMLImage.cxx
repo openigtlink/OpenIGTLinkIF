@@ -295,7 +295,10 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   int   numComponents;    // number of scalar components
   int   endian;
   igtl::Matrix4x4 matrix; // Image origin and orientation matrix
-
+  if(this->InImageMessage.IsNull())
+  {
+    this->UnpackIGTLMessage(buffer);
+  }
   scalarType = IGTLToVTKScalarType( this->InImageMessage->GetScalarType() );
   endian = this->InImageMessage->GetEndian();
   this->InImageMessage->GetDimensions(size);
