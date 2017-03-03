@@ -1155,7 +1155,6 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
     // to avoid accidental modification of the query queue as a result of response processing.
     std::vector< vtkMRMLIGTLQueryNode* > repliedQueryNodes;
     this->QueryQueueMutex->Lock();
-    double currentTime = vtkTimerLog::GetUniversalTime();
     if (this->QueryWaitingQueue.size() > 0 && updatedNode != NULL)
       {
       for (std::list< vtkWeakPointer<vtkMRMLIGTLQueryNode> >::iterator iter = this->QueryWaitingQueue.begin();
