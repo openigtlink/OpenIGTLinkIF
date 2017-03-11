@@ -840,7 +840,7 @@ int vtkMRMLIGTLConnectorNode::ReceiveController()
           vtkIGTLToMRMLBase* converter = GetConverterByIGTLDeviceType(headerMsg->GetDeviceType());
           if (converter)
             {
-            for(int i = 0; i < converter->GetAllMRMLNames().size(); i++)
+            for(unsigned int i = 0; i < converter->GetAllMRMLNames().size(); i++)
               {
               const char* mrmlName = converter->GetAllMRMLNames()[i].c_str();
               if (strcmp(node->GetNodeTagName(), mrmlName) == 0)

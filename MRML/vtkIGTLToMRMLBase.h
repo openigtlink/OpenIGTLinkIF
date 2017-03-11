@@ -101,7 +101,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // Description:
   // Functions to de-serialize (unpack) the OpenIGTLink message and store in the class instance.
   // The de-serialized message must be deleted in IGTLToMRML()
-  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer) { return 1; };
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer vtkNotUsed(buffer)) { return 1; };
 
   // Description:
   // Functions to convert OpenIGTLink message to MRML node.
