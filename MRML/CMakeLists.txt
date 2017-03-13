@@ -6,17 +6,12 @@ set(${KIT}_EXPORT_DIRECTIVE "VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT")
 
 set(${KIT}_INCLUDE_DIRECTORIES
   ${Slicer_Base_INCLUDE_DIRS}
+  ${OpenIGTLinkIO_INCLUDE_DIRS}
   ${CMAKE_CURRENT_SOURCE_DIR}/../Logic
   ${CMAKE_CURRENT_BINARY_DIR}/../Logic
   )
 
 set(${KIT}_SRCS
-  vtkIGTLCircularBuffer.cxx
-  vtkIGTLToMRMLBase.cxx
-  vtkIGTLToMRMLImage.cxx
-  vtkIGTLToMRMLLinearTransform.cxx
-  vtkIGTLToMRMLPosition.cxx
-  vtkIGTLToMRMLStatus.cxx
   vtkMRMLIGTLConnectorNode.cxx
   vtkMRMLIGTLStatusNode.cxx
   )
@@ -27,14 +22,6 @@ if(OpenIGTLink_PROTOCOL_VERSION GREATER 1)
     vtkMRMLImageMetaListNode.cxx
     vtkMRMLLabelMetaListNode.cxx
     vtkMRMLTextNode.cxx
-    vtkIGTLToMRMLPoints.cxx
-    vtkIGTLToMRMLPolyData.cxx
-    vtkIGTLToMRMLImageMetaList.cxx
-    vtkIGTLToMRMLLabelMetaList.cxx
-    vtkIGTLToMRMLTrackingData.cxx
-    vtkIGTLToMRMLSensor.cxx
-    vtkIGTLToMRMLString.cxx
-    vtkIGTLToMRMLTrajectory.cxx
     vtkMRMLIGTLTrackingDataQueryNode.cxx
     vtkMRMLIGTLTrackingDataBundleNode.cxx
     vtkMRMLIGTLSensorNode.cxx
@@ -43,6 +30,7 @@ endif()
 
 set(${KIT}_TARGET_LIBRARIES
   ${OpenIGTLink_LIBRARIES}
+  ${OpenIGTLinkIO_LIBRARIES}
   ${MRML_LIBRARIES}
   SlicerBaseLogic
   vtkSlicerAnnotationsModuleMRML
