@@ -2,7 +2,6 @@
 #define __vtkMRMLTextNode_h
 
 // OpenIGTLinkIF MRML includes
-#include "vtkIGTLToMRMLBase.h"
 #include "vtkSlicerOpenIGTLinkIFModuleMRMLExport.h"
 
 // MRML includes
@@ -10,6 +9,9 @@
 
 // VTK includes
 #include <vtkStdString.h>
+
+// STD includes
+#include <sstream>
 
 class  VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLTextNode : public vtkMRMLNode
 {

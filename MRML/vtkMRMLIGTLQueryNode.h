@@ -15,7 +15,6 @@
 #define __vtkMRMLIGTLQueryNode_h
 
 // OpenIGTLinkIF MRML includes
-#include "vtkIGTLToMRMLBase.h"
 #include "vtkSlicerOpenIGTLinkIFModuleMRMLExport.h"
 
 // MRML includes

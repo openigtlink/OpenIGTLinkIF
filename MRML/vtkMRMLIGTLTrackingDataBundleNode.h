@@ -15,7 +15,7 @@
 #define __vtkMRMLIGTLTrackingDataBundleNode_h
 
 // OpenIGTLinkIF MRML includes
-#include "vtkIGTLToMRMLBase.h"
+#include "igtlMath.h"
 #include "vtkSlicerOpenIGTLinkIFModuleMRMLExport.h"
 
 // MRML includes

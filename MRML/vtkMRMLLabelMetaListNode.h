@@ -15,7 +15,6 @@
 #define __vtkMRMLLabelMetaListNode_h
 
 // OpenIGTLinkIF MRML includes
-#include "vtkIGTLToMRMLBase.h"
 #include "vtkSlicerOpenIGTLinkIFModuleMRMLExport.h"
 
 // MRML includes
@@ -31,6 +30,7 @@
 #include <map>
 #include <vector>
 #include <set>
+#include <sstream>
 
 class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLLabelMetaListNode : public vtkMRMLNode
 {

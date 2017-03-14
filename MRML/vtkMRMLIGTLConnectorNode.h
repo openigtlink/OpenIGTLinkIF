@@ -25,6 +25,7 @@
 #include <vtkMRML.h>
 #include <vtkMRMLNode.h>
 #include <vtkMRMLStorageNode.h>
+#include <vtkMRMLScene.h>
 
 
 class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : public vtkMRMLNode
