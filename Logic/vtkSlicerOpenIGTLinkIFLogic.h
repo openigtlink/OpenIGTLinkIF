@@ -17,20 +17,9 @@
 #ifndef __vtkSlicerOpenIGTLinkIFLogic_h
 #define __vtkSlicerOpenIGTLinkIFLogic_h
 
-// OpenIGTLinkIF MRML includes
-#include "vtkIGTLToMRMLBase.h"
-#include "vtkIGTLToMRMLLinearTransform.h"
-#include "vtkIGTLToMRMLImage.h"
-#include "vtkIGTLToMRMLPosition.h"
-#include "vtkIGTLToMRMLImageMetaList.h"
-#include "vtkIGTLToMRMLLabelMetaList.h"
-#include "vtkIGTLToMRMLPoints.h"
-#include "vtkIGTLToMRMLPolyData.h"
-#include "vtkIGTLToMRMLTrackingData.h"
-#include "vtkIGTLToMRMLStatus.h"
-#include "vtkIGTLToMRMLSensor.h"
-#include "vtkIGTLToMRMLString.h"
-#include "vtkIGTLToMRMLTrajectory.h"
+// OpenIGTLinkIO Device includes
+#include "igtlioDevice.h"
+#include "igtlioDeviceFactory.h"
 
 #include "vtkSlicerOpenIGTLinkIFModuleLogicExport.h"
 
@@ -51,6 +40,7 @@
 
 // STD includes
 #include <vector>
+#include <string.h>
 
 class vtkMRMLIGTLConnectorNode;
 
@@ -72,7 +62,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   } IGTLMrmlNodeInfoType;
 
   typedef std::vector<IGTLMrmlNodeInfoType>         IGTLMrmlNodeListType;
-  typedef std::vector<vtkIGTLToMRMLBase*>           MessageConverterListType;
 
   // Work phase keywords used in NaviTrack (defined in BRPTPRInterface.h)
 
@@ -102,7 +91,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   virtual void OnMRMLNodeModified(vtkMRMLNode* /*node*/){}
 
   //----------------------------------------------------------------
-  // Connector and converter Management
+  // Connector and device Management
   //----------------------------------------------------------------
 
   // Access connectors
@@ -114,13 +103,13 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   // Device Name management
   int  SetRestrictDeviceName(int f);
 
-  int  RegisterMessageConverter(vtkIGTLToMRMLBase* converter);
-  int  UnregisterMessageConverter(vtkIGTLToMRMLBase* converter);
+  int  RegisterMessageDevice(igtlio::Device* device);
+  int  UnregisterMessageDevice(igtlio::Device* device);
 
-  unsigned int       GetNumberOfConverters();
-  vtkIGTLToMRMLBase* GetConverter(unsigned int i);
-  vtkIGTLToMRMLBase* GetConverterByMRMLTag(const char* mrmlTag);
-  vtkIGTLToMRMLBase* GetConverterByDeviceType(const char* deviceType);
+  unsigned int       GetNumberOfDevices();
+  igtlio::Device* GetDevice(unsigned int i);
+  igtlio::Device* GetDeviceByMRMLTag(const char* mrmlTag);
+  igtlio::Device* GetDeviceByDeviceType(const char* deviceType);
 
   //----------------------------------------------------------------
   // MRML Management
@@ -149,7 +138,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   void AddMRMLConnectorNodeObserver(vtkMRMLIGTLConnectorNode * connectorNode);
   void RemoveMRMLConnectorNodeObserver(vtkMRMLIGTLConnectorNode * connectorNode);
 
-  void RegisterMessageConverters(vtkMRMLIGTLConnectorNode * connectorNode);
+  void RegisterMessageDevices(vtkMRMLIGTLConnectorNode * connectorNode);
 
   void UpdateAll();
   void UpdateSliceDisplay();
@@ -164,27 +153,17 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   //----------------------------------------------------------------
 
   //ConnectorMapType              ConnectorMap;
-  MessageConverterListType      MessageConverterList;
+  vtkMRMLIGTLConnectorNode::MessageDeviceListType      MessageDeviceList;
 
   //int LastConnectorID;
   int RestrictDeviceName;
 
   //----------------------------------------------------------------
-  // IGTL-MRML converters
+  // IGTL-MRML devices
   //----------------------------------------------------------------
-  vtkIGTLToMRMLLinearTransform* LinearTransformConverter;
-  vtkIGTLToMRMLImage*           ImageConverter;
-  vtkIGTLToMRMLPosition*        PositionConverter;
-  vtkIGTLToMRMLStatus*          StatusConverter;
-  vtkIGTLToMRMLImageMetaList*   ImageMetaListConverter;
-  vtkIGTLToMRMLLabelMetaList*   LabelMetaListConverter;
-  vtkIGTLToMRMLPoints*          PointConverter;
-  vtkIGTLToMRMLPolyData*        PolyDataConverter;
-  vtkIGTLToMRMLSensor*          SensorConverter;
-  vtkIGTLToMRMLString*          StringConverter;
-  vtkIGTLToMRMLTrackingData*    TrackingDataConverter;
-  vtkIGTLToMRMLTrajectory*      TrajectoryConverter;
-
+  igtlio::DeviceFactory* DeviceFactory;
+  
+  
 private:
 
   vtkSlicerOpenIGTLinkIFLogic(const vtkSlicerOpenIGTLinkIFLogic&); // Not implemented

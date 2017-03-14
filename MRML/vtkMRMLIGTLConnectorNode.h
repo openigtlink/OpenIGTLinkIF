@@ -20,6 +20,7 @@
 
 // OpenIGTLinkIO includes
 #include "igtlioConnector.h"
+
 // MRML includes
 #include <vtkMRML.h>
 #include <vtkMRMLNode.h>
@@ -130,7 +131,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   
   typedef std::map<std::string, igtlio::Connector::NodeInfoType>   NodeInfoMapType;
   
-  typedef std::list< vtkSmartPointer<igtlio::Device> >   MessageDeviceListType;
+  typedef std::vector< vtkSmartPointer<igtlio::Device> >   MessageDeviceListType;
   
   typedef std::map<std::string, vtkSmartPointer <igtlio::Device> > MessageDeviceMapType;
 
