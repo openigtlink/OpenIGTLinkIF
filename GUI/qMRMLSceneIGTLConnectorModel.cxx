@@ -66,13 +66,13 @@ QStandardItem* qMRMLSceneIGTLConnectorModel::insertNode(vtkMRMLNode* node, QStan
   if (this->listenNodeModifiedEvent() &&
       node->IsA("vtkMRMLIGTLConnectorNode"))
     {
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::ConnectedEvent,
+    qvtkConnect(node, igtlio::Connector::ConnectedEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::DisconnectedEvent,
+    qvtkConnect(node, igtlio::Connector::DisconnectedEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::ActivatedEvent,
+    qvtkConnect(node, igtlio::Connector::ActivatedEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::DeactivatedEvent,
+    qvtkConnect(node, igtlio::Connector::DeactivatedEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
     }
   return insertedItem;
@@ -130,21 +130,21 @@ void qMRMLSceneIGTLConnectorModel::updateItemDataFromNode(QStandardItem* item, v
       }
     case qMRMLSceneIGTLConnectorModel::TypeColumn:
       {
-      Q_ASSERT(cnode->GetType() < vtkMRMLIGTLConnectorNode::NUM_TYPE);
-      item->setText(QString(vtkMRMLIGTLConnectorNode::ConnectorTypeStr[cnode->GetType()]));
+      Q_ASSERT(cnode->IOConnector->GetType() < igtlio::Connector::NUM_TYPE);
+      item->setText(QString(igtlio::Connector::ConnectorTypeStr[cnode->IOConnector->GetType()]));
       break;
       }
     case qMRMLSceneIGTLConnectorModel::StatusColumn:
       {
-      Q_ASSERT(cnode->GetState() < vtkMRMLIGTLConnectorNode::NUM_STATE);
-      item->setText(QString(vtkMRMLIGTLConnectorNode::ConnectorStateStr[cnode->GetState()]));
+      Q_ASSERT(cnode->IOConnector->GetState() < igtlio::Connector::NUM_STATE);
+      item->setText(QString(igtlio::Connector::ConnectorStateStr[cnode->IOConnector->GetState()]));
       break;
       }
     case qMRMLSceneIGTLConnectorModel::HostnameColumn:
       {
-      if (cnode->GetType() == vtkMRMLIGTLConnectorNode::TYPE_CLIENT)
+      if (cnode->IOConnector->GetType() == igtlio::Connector::TYPE_CLIENT)
         {
-        item->setText(QString(cnode->GetServerHostname()));
+        item->setText(QString(cnode->IOConnector->GetServerHostname()));
         }
       else
         {
@@ -154,7 +154,7 @@ void qMRMLSceneIGTLConnectorModel::updateItemDataFromNode(QStandardItem* item, v
       }
     case qMRMLSceneIGTLConnectorModel::PortColumn:
       {
-      item->setText(QString("%1").arg(cnode->GetServerPort()));
+      item->setText(QString("%1").arg(cnode->IOConnector->GetServerPort()));
       break;
       }
     default:

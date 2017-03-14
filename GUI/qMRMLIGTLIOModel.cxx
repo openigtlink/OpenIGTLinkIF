@@ -144,17 +144,17 @@ QStandardItem* qMRMLIGTLIOModel::insertNode(vtkMRMLNode* node, QStandardItem* pa
   if (this->listenNodeModifiedEvent() &&
       node->IsA("vtkMRMLIGTLConnectorNode"))
     {
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::ConnectedEvent,
+    qvtkConnect(node, igtlio::Connector::ConnectedEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::DisconnectedEvent,
+    qvtkConnect(node, igtlio::Connector::DisconnectedEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::ActivatedEvent,
+    qvtkConnect(node, igtlio::Connector::ActivatedEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::DeactivatedEvent,
+    qvtkConnect(node, igtlio::Connector::DeactivatedEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::NewDeviceEvent,
+    qvtkConnect(node, igtlio::Connector::NewDeviceEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, vtkMRMLIGTLConnectorNode::DeviceModifiedEvent,
+    qvtkConnect(node, igtlio::Connector::DeviceModifiedEvent,
                 this, SLOT(onDeviceVisibilityModified(vtkObject*)));
 
     }
@@ -185,15 +185,15 @@ void qMRMLIGTLIOModel::updateItemDataFromNode(QStandardItem* item, vtkMRMLNode* 
       }
     case qMRMLIGTLIOModel::TypeColumn:
       {
-      Q_ASSERT(cnode->GetType() < vtkMRMLIGTLConnectorNode::NUM_TYPE);
-      //item->setText(QString(vtkMRMLIGTLConnectorNode::ConnectorTypeStr[cnode->GetType()]));
+      Q_ASSERT(cnode->IOConnector->GetType() < igtlio::Connector::NUM_TYPE);
+      //item->setText(QString(igtlio::Connector::ConnectorTypeStr[cnode->GetType()]));
       item->setText("");
       break;
       }
     case qMRMLIGTLIOModel::StatusColumn:
       {
-      Q_ASSERT(cnode->GetState() < vtkMRMLIGTLConnectorNode::NUM_STATE);
-      //item->setText(QString(vtkMRMLIGTLConnectorNode::ConnectorStateStr[cnode->GetState()]));
+      Q_ASSERT(cnode->IOConnector->GetState() < igtlio::Connector::NUM_STATE);
+      //item->setText(QString(igtlio::Connector::ConnectorStateStr[cnode->GetState()]));
       item->setText("");
       break;
       }
@@ -355,10 +355,11 @@ void qMRMLIGTLIOModel::updateIOTreeBranch(vtkMRMLIGTLConnectorNode* node, QStand
         QStandardItem* item2 = new QStandardItem;
         item2->setData("io"+QString(inode->GetID()), qMRMLSceneModel::UIDRole);
         item2->setFlags(Qt::ItemIsEnabled|Qt::ItemIsSelectable);
-        vtkIGTLToMRMLBase* converter = node->GetConverterByNodeID(inode->GetID());
-        if (converter)
+          
+        igtlio::Device* device = node->MRMLIDToDeviceMap[inode->GetID()];
+        if (device)
           {
-          item2->setText(converter->GetIGTLName());
+          item2->setText(device->GetDeviceType().c_str());
           }
         else
           {

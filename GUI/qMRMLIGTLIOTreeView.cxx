@@ -190,7 +190,7 @@ int qMRMLIGTLIOTreeView::rowProperty(const QModelIndex& index, vtkMRMLIGTLConnec
 
   cnode = NULL;
   dnode = NULL;
-  dir = vtkMRMLIGTLConnectorNode::IO_UNSPECIFIED;
+  dir = igtlio::Connector::IO_UNSPECIFIED;
   
   qMRMLSceneModel* sceneModel = qobject_cast<qMRMLSceneModel*>(d->SortFilterModel->sourceModel());
   QStandardItem* item = sceneModel->itemFromIndex(d->SortFilterModel->mapToSource(index));
@@ -211,14 +211,14 @@ int qMRMLIGTLIOTreeView::rowProperty(const QModelIndex& index, vtkMRMLIGTLConnec
     {
     vtkMRMLNode* node = sceneModel->mrmlNodeFromIndex(parent1->index());
     cnode = vtkMRMLIGTLConnectorNode::SafeDownCast(node);
-    dir = vtkMRMLIGTLConnectorNode::IO_INCOMING;
+    dir = igtlio::Connector::IO_INCOMING;
     return TYPE_STREAM;
     }
   else if (text.compare(QString("OUT")) == 0)
     {
     vtkMRMLNode* node = sceneModel->mrmlNodeFromIndex(parent1->index());
     cnode = vtkMRMLIGTLConnectorNode::SafeDownCast(node);
-    dir = vtkMRMLIGTLConnectorNode::IO_OUTGOING;
+    dir = igtlio::Connector::IO_OUTGOING;
     return TYPE_STREAM;
     }
 
@@ -251,19 +251,19 @@ int qMRMLIGTLIOTreeView::rowProperty(const QModelIndex& index, vtkMRMLIGTLConnec
     QString text = grandParent->child(parent1->row(), 0)->text();
     if (text.compare(QString("IN")) == 0)
       {
-      dir = vtkMRMLIGTLConnectorNode::IO_INCOMING;
+      dir = igtlio::Connector::IO_INCOMING;
       return TYPE_DATANODE;
       }
     else
       {
-      dir = vtkMRMLIGTLConnectorNode::IO_OUTGOING;
+      dir = igtlio::Connector::IO_OUTGOING;
       return TYPE_DATANODE;
       }
     }
   else
     {
     cnode = NULL;
-    dir = vtkMRMLIGTLConnectorNode::IO_UNSPECIFIED;
+    dir = igtlio::Connector::IO_UNSPECIFIED;
     return TYPE_UNKNOWN;
     }
 
@@ -302,13 +302,13 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
         {
         dnode->SetAttribute("IGTLVisible", "true");
         }
-      cnode->InvokeEvent(vtkMRMLIGTLConnectorNode::DeviceModifiedEvent);
+      cnode->InvokeEvent(igtlio::Connector::DeviceModifiedEvent);
       }
     emit ioTreeViewUpdated(type, cnode, dir, dnode);
     }
   else if (index.column() == qMRMLIGTLIOModel::PushOnConnectColumn)
     {
-    if (dnode && type == TYPE_DATANODE && dir == vtkMRMLIGTLConnectorNode::IO_OUTGOING)
+    if (dnode && type == TYPE_DATANODE && dir == igtlio::Connector::IO_OUTGOING)
       {
       // Toggle the checkbox for "push on connect" feature
       const char * attr = dnode->GetAttribute("OpenIGTLinkIF.pushOnConnect");
@@ -320,7 +320,7 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
         {
         dnode->SetAttribute("OpenIGTLinkIF.pushOnConnect", "true");
         }
-      cnode->InvokeEvent(vtkMRMLIGTLConnectorNode::DeviceModifiedEvent);
+      cnode->InvokeEvent(igtlio::Connector::DeviceModifiedEvent);
       }
     emit ioTreeViewUpdated(type, cnode, dir, dnode);
     }

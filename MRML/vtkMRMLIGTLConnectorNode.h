@@ -131,9 +131,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   
   typedef std::map<std::string, igtlio::Connector::NodeInfoType>   NodeInfoMapType;
   
-  typedef std::vector< vtkSmartPointer<igtlio::Device> >   MessageDeviceListType;
-  
   typedef std::map<std::string, vtkSmartPointer <igtlio::Device> > MessageDeviceMapType;
+  
+  MessageDeviceMapType  MRMLIDToDeviceMap;
 
 #ifndef __VTK_WRAP__
   //BTX
@@ -176,7 +176,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   
   MessageDeviceListType MessageDeviceList;
   MessageDeviceMapType  IGTLNameToDeviceMap;
-  MessageDeviceMapType  MRMLIDToDeviceMap;
   
   NodeInfoMapType IncomingMRMLNodeInfoMap;
 

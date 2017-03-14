@@ -118,7 +118,7 @@ void qSlicerOpenIGTLinkIFModuleWidget::onAddConnectorButtonClicked()
       {
       this->mrmlScene()->AddNode(node);
       d->ConnectorListView->setSelectedNode(node->GetID());
-      node->SetType(vtkMRMLIGTLConnectorNode::TYPE_CLIENT);
+      node->IOConnector->SetType(igtlio::Connector::TYPE_CLIENT);
       node->Delete();
       }
     }
@@ -136,7 +136,7 @@ void qSlicerOpenIGTLinkIFModuleWidget::onRemoveConnectorButtonClicked()
     }
   vtkMRMLIGTLConnectorNode * connectorNode = vtkMRMLIGTLConnectorNode::SafeDownCast(node);
   Q_ASSERT(connectorNode);
-  connectorNode->Stop();
+  connectorNode->IOConnector->Stop();
   this->mrmlScene()->RemoveNode(connectorNode);
 }
 

@@ -281,7 +281,7 @@ int vtkSlicerOpenIGTLinkIFLogic::RegisterMessageDevice(igtlio::Device* Device)
   // Search the list and check if the same Device has already been registered.
   int found = 0;
 
-  vtkMRMLIGTLConnectorNode::MessageDeviceListType::iterator iter;
+  MessageDeviceListType::iterator iter;
   for (iter = this->MessageDeviceList.begin();
        iter != this->MessageDeviceList.end();
        iter ++)
@@ -337,7 +337,7 @@ int vtkSlicerOpenIGTLinkIFLogic::UnregisterMessageDevice(igtlio::Device* Device)
     }
 
   // Look up the message Device list
-  vtkMRMLIGTLConnectorNode::MessageDeviceListType::iterator iter;
+  MessageDeviceListType::iterator iter;
   iter = this->MessageDeviceList.begin();
   while ((*iter) != Device) iter ++;
 
@@ -399,7 +399,7 @@ igtlio::Device* vtkSlicerOpenIGTLinkIFLogic::GetDeviceByMRMLTag(const char* mrml
 
   igtlio::Device* Device = NULL;
 
-  vtkMRMLIGTLConnectorNode::MessageDeviceListType::iterator iter;
+  MessageDeviceListType::iterator iter;
   for (iter = this->MessageDeviceList.begin();
        iter != this->MessageDeviceList.end();
        iter ++)
@@ -419,7 +419,7 @@ igtlio::Device* vtkSlicerOpenIGTLinkIFLogic::GetDeviceByDeviceType(const char* d
 {
   igtlio::Device* Device = NULL;
 
-  vtkMRMLIGTLConnectorNode::MessageDeviceListType::iterator iter;
+  MessageDeviceListType::iterator iter;
   for (iter = this->MessageDeviceList.begin();
        iter != this->MessageDeviceList.end();
        iter ++)
@@ -549,7 +549,7 @@ void vtkSlicerOpenIGTLinkIFLogic::GetDeviceNamesFromMrml(IGTLMrmlNodeListType &l
 
   list.clear();
 
-  vtkMRMLIGTLConnectorNode::MessageDeviceListType::iterator mcliter;
+  MessageDeviceListType::iterator mcliter;
   for (mcliter = this->MessageDeviceList.begin();
        mcliter != this->MessageDeviceList.end();
        mcliter ++)
@@ -588,7 +588,7 @@ void vtkSlicerOpenIGTLinkIFLogic::GetDeviceNamesFromMrml(IGTLMrmlNodeListType &l
 
   list.clear();
 
-  vtkMRMLIGTLConnectorNode::MessageDeviceListType::iterator mcliter;
+  MessageDeviceListType::iterator mcliter;
   for (mcliter = this->MessageDeviceList.begin();
        mcliter != this->MessageDeviceList.end();
        mcliter ++)

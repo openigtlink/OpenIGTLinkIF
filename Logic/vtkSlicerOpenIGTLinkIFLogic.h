@@ -19,6 +19,7 @@
 
 // OpenIGTLinkIO Device includes
 #include "igtlioDevice.h"
+#include "igtlioConnector.h"
 #include "igtlioDeviceFactory.h"
 
 #include "vtkSlicerOpenIGTLinkIFModuleLogicExport.h"
@@ -34,6 +35,9 @@
 // MRML includes
 #include <vtkMRMLTransformNode.h>
 #include <vtkMRMLFiducialListNode.h>
+#include <vtkMRMLScene.h>
+
+
 
 // VTK includes
 #include <vtkMultiThreader.h>
@@ -153,7 +157,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   //----------------------------------------------------------------
 
   //ConnectorMapType              ConnectorMap;
-  vtkMRMLIGTLConnectorNode::MessageDeviceListType      MessageDeviceList;
+  MessageDeviceListType      MessageDeviceList;
 
   //int LastConnectorID;
   int RestrictDeviceName;

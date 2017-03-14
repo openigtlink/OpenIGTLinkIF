@@ -385,6 +385,62 @@ void vtkMRMLIGTLConnectorNode::OnNodeReferenceModified(vtkMRMLNodeReference *ref
 }
 
 //---------------------------------------------------------------------------
+igtlio::Connector::NodeInfoType* vtkMRMLIGTLConnectorNode::RegisterIncomingMRMLNode(vtkMRMLNode* node)
+{
+  
+  if (!node)
+  {
+    return NULL;
+  }
+  
+  // Check if the node has already been registered.
+  if (this->HasNodeReferenceID(this->GetIncomingNodeReferenceRole(), node->GetID()))
+  {
+    // the node has been already registered.
+  }
+  else
+  {
+    this->AddAndObserveNodeReferenceID(this->GetIncomingNodeReferenceRole(), node->GetID());
+    this->Modified();
+  }
+  
+  return &this->IncomingMRMLNodeInfoMap[node->GetID()];
+  
+}
+
+
+//---------------------------------------------------------------------------
+void vtkMRMLIGTLConnectorNode::UnregisterIncomingMRMLNode(vtkMRMLNode* node)
+{
+  
+  if (!node)
+  {
+    return;
+  }
+  
+  // Check if the node is on the reference list for outgoing nodes
+  int n = this->GetNumberOfNodeReferences(this->GetIncomingNodeReferenceRole());
+  for (int i = 0; i < n; i ++)
+  {
+    const char* id = this->GetNthNodeReferenceID(this->GetIncomingNodeReferenceRole(), i);
+    if (strcmp(node->GetID(), id) == 0)
+    {
+      // Alredy on the list. Remove it.
+      this->RemoveNthNodeReferenceID(this->GetIncomingNodeReferenceRole(), i);
+      NodeInfoMapType::iterator iter;
+      iter = this->IncomingMRMLNodeInfoMap.find(id);
+      if (iter != this->IncomingMRMLNodeInfoMap.end())
+      {
+        this->IncomingMRMLNodeInfoMap.erase(iter);
+      }
+      this->Modified();
+      break;
+    }
+  }
+  
+}
+
+//---------------------------------------------------------------------------
 unsigned int vtkMRMLIGTLConnectorNode::GetNumberOfOutgoingMRMLNodes()
 {
   //return this->OutgoingMRMLNodeList.size();
@@ -407,6 +463,67 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOutgoingMRMLNode(unsigned int i)
     {
     return NULL;
     }
+}
+
+//---------------------------------------------------------------------------
+int vtkMRMLIGTLConnectorNode::RegisterOutgoingMRMLNode(vtkMRMLNode* node, const char* devType)
+{
+  
+  if (!node)
+  {
+    return 0;
+  }
+  
+  // TODO: Need to check the existing device type?
+  if (node->GetAttribute("OpenIGTLinkIF.out.type") == NULL)
+  {
+    node->SetAttribute("OpenIGTLinkIF.out.type", devType);
+  }
+  
+  // Check if the node is on the reference list for outgoing nodes
+  int n = this->GetNumberOfNodeReferences(this->GetOutgoingNodeReferenceRole());
+  for (int i = 0; i < n; i ++)
+  {
+    const char* id = GetNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
+    if (strcmp(node->GetID(), id) == 0)
+    {
+      // Alredy on the list. Remove it.
+      this->RemoveNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
+      break;
+    }
+  }
+  
+  this->AddAndObserveNodeReferenceID(this->GetOutgoingNodeReferenceRole(), node->GetID());
+  
+  this->Modified();
+  
+  return 1;
+  
+}
+
+
+//---------------------------------------------------------------------------
+void vtkMRMLIGTLConnectorNode::UnregisterOutgoingMRMLNode(vtkMRMLNode* node)
+{
+  if (!node)
+  {
+    return;
+  }
+  
+  // Check if the node is on the reference list for outgoing nodes
+  int n = this->GetNumberOfNodeReferences(this->GetOutgoingNodeReferenceRole());
+  for (int i = 0; i < n; i ++)
+  {
+    const char* id = this->GetNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
+    if (strcmp(node->GetID(), id) == 0)
+    {
+      // Alredy on the list. Remove it.
+      this->RemoveNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
+      this->Modified();
+      break;
+    }
+  }
+  
 }
 
 //---------------------------------------------------------------------------
