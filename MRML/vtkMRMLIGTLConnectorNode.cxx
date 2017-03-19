@@ -15,6 +15,9 @@ Version:   $Revision: 1.2 $
 // OpenIGTLinkIF MRML includes
 #include "vtkMRMLIGTLConnectorNode.h"
 
+#include <vtkMutexLock.h>
+#include <vtkTimerLog.h>
+
 //------------------------------------------------------------------------------
 vtkMRMLNodeNewMacro(vtkMRMLIGTLConnectorNode);
 
@@ -23,7 +26,25 @@ vtkMRMLNodeNewMacro(vtkMRMLIGTLConnectorNode);
 vtkMRMLIGTLConnectorNode::vtkMRMLIGTLConnectorNode()
 {
   this->HideFromEditors = false;
-  IOConnector = igtlio::Connector::New() ;
+  this->MRMLIDToDeviceMap.clear();
+  this->IGTLNameToDeviceMap.clear();
+  this->IncomingMRMLNodeInfoMap.clear();
+  IOConnector = igtlio::Connector::New();
+  this->IncomingNodeReferenceRole=NULL;
+  this->IncomingNodeReferenceMRMLAttributeName=NULL;
+  this->OutgoingNodeReferenceRole=NULL;
+  this->OutgoingNodeReferenceMRMLAttributeName=NULL;
+  
+  this->SetIncomingNodeReferenceRole("incoming");
+  this->SetIncomingNodeReferenceMRMLAttributeName("incomingNodeRef");
+  this->AddNodeReferenceRole(this->GetIncomingNodeReferenceRole(),
+                             this->GetIncomingNodeReferenceMRMLAttributeName());
+  
+  this->SetOutgoingNodeReferenceRole("outgoing");
+  this->SetOutgoingNodeReferenceMRMLAttributeName("outgoingNodeRef");
+  this->AddNodeReferenceRole(this->GetOutgoingNodeReferenceRole(),
+                             this->GetOutgoingNodeReferenceMRMLAttributeName());
+
 }
 
 //----------------------------------------------------------------------------
@@ -559,7 +580,13 @@ int vtkMRMLIGTLConnectorNode::PushNode(vtkMRMLNode* node, int event)
     {
     return 0;
     }
-
+  
+  if (!(node->GetID()))
+  {
+    return 0;
+  }
+  
+  
   MessageDeviceMapType::iterator iter = this->MRMLIDToDeviceMap.find(node->GetID());
   if (iter == this->MRMLIDToDeviceMap.end())
     {
@@ -581,6 +608,96 @@ int vtkMRMLIGTLConnectorNode::PushNode(vtkMRMLNode* node, int event)
     this->IOConnector->SendMessage(key, device->MESSAGE_PREFIX_GET);
   }
   return 0;
+}
+
+
+//---------------------------------------------------------------------------
+void vtkMRMLIGTLConnectorNode::PushQuery(vtkMRMLIGTLQueryNode* node)
+{
+  if (node==NULL)
+  {
+    vtkErrorMacro("vtkMRMLIGTLConnectorNode::PushQuery failed: invalid input node");
+    return;
+  }
+  igtlio::DeviceKeyType key;
+  key.name = node->GetName();
+  key.type = node->GetNodeTagName();
+  
+  this->IOConnector->SendMessage(key, igtlio::Device::MESSAGE_PREFIX_GET);
+  this->QueryQueueMutex->Lock();
+  node->SetTimeStamp(vtkTimerLog::GetUniversalTime());
+  node->SetQueryStatus(vtkMRMLIGTLQueryNode::STATUS_WAITING);
+  node->SetConnectorNodeID(this->GetID());
+  this->QueryWaitingQueue.push_back(node);
+  this->QueryQueueMutex->Unlock();
+}
+
+
+//---------------------------------------------------------------------------
+void vtkMRMLIGTLConnectorNode::CancelQuery(vtkMRMLIGTLQueryNode* node)
+{
+  if (node==NULL)
+  {
+    vtkErrorMacro("vtkMRMLIGTLConnectorNode::PushQuery failed: invalid input node");
+    return;
+  }
+  this->QueryQueueMutex->Lock();
+  this->QueryWaitingQueue.remove(node);
+  node->SetConnectorNodeID("");
+  this->QueryQueueMutex->Unlock();
+}
+
+//---------------------------------------------------------------------------
+void vtkMRMLIGTLConnectorNode::LockIncomingMRMLNode(vtkMRMLNode* node)
+{
+  NodeInfoMapType::iterator iter;
+  for (iter = this->IncomingMRMLNodeInfoMap.begin(); iter != this->IncomingMRMLNodeInfoMap.end(); iter++)
+  {
+    //if ((iter->second).node == node)
+    if (iter->first.compare(node->GetID()) == 0)
+    {
+      (iter->second).lock = 1;
+    }
+  }
+  
+}
+
+
+//---------------------------------------------------------------------------
+void vtkMRMLIGTLConnectorNode::UnlockIncomingMRMLNode(vtkMRMLNode* node)
+{
+  // Check if the node has already been added in the locked node list
+  NodeInfoMapType::iterator iter;
+  for (iter = this->IncomingMRMLNodeInfoMap.begin(); iter != this->IncomingMRMLNodeInfoMap.end(); iter++)
+  {
+    //if ((iter->second).node == node)
+    if (iter->first.compare(node->GetID()) == 0)
+    {
+      (iter->second).lock = 0;
+      return;
+    }
+  }
+}
+
+
+//---------------------------------------------------------------------------
+int vtkMRMLIGTLConnectorNode::GetIGTLTimeStamp(vtkMRMLNode* node, int& second, int& nanosecond)
+{
+  // Check if the node has already been added in the locked node list
+  NodeInfoMapType::iterator iter;
+  for (iter = this->IncomingMRMLNodeInfoMap.begin(); iter != this->IncomingMRMLNodeInfoMap.end(); iter++)
+  {
+    //if ((iter->second).node == node)
+    if (iter->first.compare(node->GetID()) == 0)
+    {
+      second = (iter->second).second;
+      nanosecond = (iter->second).nanosecond;
+      return 1;
+    }
+  }
+  
+  return 0;
+  
 }
 
 

@@ -56,7 +56,13 @@ vtkSlicerOpenIGTLinkIFLogic::vtkSlicerOpenIGTLinkIFLogic()
   this->MessageDeviceList.clear();
 
   this->DeviceFactory = igtlio::DeviceFactory::New();
-
+  
+  std::vector<std::string> deviceTypes = this->DeviceFactory->GetAvailableDeviceTypes();
+  for (int typeIndex = 0; typeIndex<deviceTypes.size();typeIndex++)
+  {
+    this->MessageDeviceList.push_back(DeviceFactory->GetCreator(deviceTypes[typeIndex])->Create(""));
+  }
+    
   //this->LocatorTransformNode = NULL;
 }
 

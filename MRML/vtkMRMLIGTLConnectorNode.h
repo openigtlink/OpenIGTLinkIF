@@ -28,6 +28,7 @@
 #include <vtkMRMLScene.h>
 
 
+
 class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : public vtkMRMLNode
 {
  public:
@@ -101,6 +102,14 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   // A function to explicitly push node to OpenIGTLink. The function is called either by
   // external nodes or MRML event hander in the connector node.
   int PushNode(vtkMRMLNode* node, int event=-1);
+  
+  // Query queueing mechanism is needed to send all queries from the connector thread.
+  // Queries can be pushed to the end of the QueryQueue by calling RequestInvoke from any thread,
+  // and they will be Invoked in the main thread.
+  // Use a weak pointer to make sure we don't try to access the query node after it is deleted from the scene.
+  std::list< vtkWeakPointer<vtkMRMLIGTLQueryNode> > QueryWaitingQueue;
+  vtkMutexLock* QueryQueueMutex;
+  
   
   // Description:
   // Push query int the query list.
