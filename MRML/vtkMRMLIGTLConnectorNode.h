@@ -20,6 +20,7 @@
 
 // OpenIGTLinkIO includes
 #include "igtlioConnector.h"
+#include "igtlioDeviceFactory.h"
 
 // MRML includes
 #include <vtkMRML.h>
@@ -63,7 +64,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
 
   // method to propagate events generated in mrml
   virtual void ProcessMRMLEvents ( vtkObject *caller, unsigned long event, void *callData );
-
+  
+  
+  void ConnectEvents();
   // Description:
   // Set and start observing MRML node for outgoing data.
   // If devType == NULL, a converter is chosen based only on MRML Tag.
@@ -72,6 +75,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   // Description:
   // Stop observing and remove MRML node for outgoing data.
   void UnregisterOutgoingMRMLNode(vtkMRMLNode* node);
+  
+  void ProcessVTKObjectEvents( vtkObject *caller, unsigned long event, void *callData );
   
   // Description:
   // Register MRML node for incoming data.
@@ -188,6 +193,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   MessageDeviceMapType  IGTLNameToDeviceMap;
   
   NodeInfoMapType IncomingMRMLNodeInfoMap;
+  
+  igtlio::DeviceFactoryPointer LocalDeviceFactory;
 
 };
 

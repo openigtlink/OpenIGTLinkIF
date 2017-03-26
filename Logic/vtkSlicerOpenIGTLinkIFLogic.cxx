@@ -160,9 +160,10 @@ void vtkSlicerOpenIGTLinkIFLogic::RegisterMessageDevices(vtkMRMLIGTLConnectorNod
     return;
     }
   for (unsigned short i = 0; i < this->GetNumberOfDevices(); i ++)
-    {
+  {
     connectorNode->IOConnector->AddDevice(this->GetDevice(i));
-    }
+    connectorNode->ConnectEvents();
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -203,7 +204,7 @@ void vtkSlicerOpenIGTLinkIFLogic::OnMRMLSceneNodeAdded(vtkMRMLNode* node)
     connectorNode->IOConnector->SetRestrictDeviceName(0);
 
     this->AddMRMLConnectorNodeObserver(connectorNode);
-    this->RegisterMessageDevices(connectorNode);
+    //this->RegisterMessageDevices(connectorNode);
     }
 }
 
@@ -292,8 +293,7 @@ int vtkSlicerOpenIGTLinkIFLogic::RegisterMessageDevice(igtlio::Device* Device)
        iter != this->MessageDeviceList.end();
        iter ++)
     {
-    if (Device->GetDeviceType().c_str() && (strcmp(Device->GetDeviceType().c_str(), (*iter)->GetDeviceType().c_str()) == 0) &&
-        Device->GetDeviceName().c_str() && (strcmp(Device->GetDeviceName().c_str(), (*iter)->GetDeviceName().c_str()) == 0))
+    if (Device->GetDeviceType().c_str() && (strcmp(Device->GetDeviceType().c_str(), (*iter)->GetDeviceType().c_str()) == 0))
       {
       found = 1;
       }
@@ -303,7 +303,7 @@ int vtkSlicerOpenIGTLinkIFLogic::RegisterMessageDevice(igtlio::Device* Device)
     return 0;
     }
 
-  if (Device->GetDeviceType().c_str() && Device->GetDeviceName().c_str())
+  if (Device->GetDeviceType().c_str())
     // TODO: is this correct? Shouldn't it be "&&"
     {
     this->MessageDeviceList.push_back(Device);
