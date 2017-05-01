@@ -57,6 +57,10 @@ vtkMRMLIGTLConnectorNode::vtkMRMLIGTLConnectorNode()
   this->SetOutgoingNodeReferenceMRMLAttributeName("outgoingNodeRef");
   this->AddNodeReferenceRole(this->GetOutgoingNodeReferenceRole(),
                              this->GetOutgoingNodeReferenceMRMLAttributeName());
+  
+  //IOConnectorCallback = vtkSmartPointer<vtkCallbackCommand>::New();
+  //IOConnectorCallback->SetCallback(&this->ProcessVTKObjectEvents);
+  //IOConnectorCallback->SetClientData(this);
 
 }
 
@@ -71,7 +75,7 @@ void vtkMRMLIGTLConnectorNode::ConnectEvents()
   IOConnector->AddObserver(IOConnector->DisconnectedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessVTKObjectEvents);
   IOConnector->AddObserver(IOConnector->ActivatedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessVTKObjectEvents);
   IOConnector->AddObserver(IOConnector->DeactivatedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessVTKObjectEvents);
-  IOConnector->AddObserver(IOConnector->NewDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessVTKObjectEvents);
+  this->NewDeviceEventObeserverTag = IOConnector->AddObserver(IOConnector->NewDeviceEvent, this,  &vtkMRMLIGTLConnectorNode::ProcessVTKObjectEvents);
   IOConnector->AddObserver(IOConnector->DeviceModifiedEvent,this, &vtkMRMLIGTLConnectorNode::ProcessVTKObjectEvents);
   IOConnector->AddObserver(IOConnector->RemovedDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessVTKObjectEvents);
 }
@@ -164,8 +168,8 @@ void vtkMRMLIGTLConnectorNode::ProcessVTKObjectEvents( vtkObject *caller, unsign
   }
   if(event==IOConnector->RemovedDeviceEvent)
   {}
-  
-  //this->InvokeCustomModifiedEvent(event, this);
+  //propagate the event to the connector property and treeview widgets
+  this->InvokeEvent(event);
 }
 
 //----------------------------------------------------------------------------
@@ -741,8 +745,10 @@ void vtkMRMLIGTLConnectorNode::PushQuery(vtkMRMLIGTLQueryNode* node)
   //igtlio::DevicePointer creater = LocalDeviceFactory->create(node->GetIGTLName(),"");
   if(this->IOConnector->GetDevice(key)==NULL)
   {
+    this->IOConnector->RemoveObserver(this->NewDeviceEventObeserverTag);
     vtkSmartPointer<igtlio::DeviceCreator> deviceCreator = LocalDeviceFactory->GetCreator(key.GetBaseTypeName());
     this->IOConnector->AddDevice(deviceCreator->Create(key.name));
+    this->NewDeviceEventObeserverTag = IOConnector->AddObserver(IOConnector->NewDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessVTKObjectEvents);
   }
   this->IOConnector->SendMessage(key, igtlio::Device::MESSAGE_PREFIX_GET);
   this->QueryQueueMutex->Lock();

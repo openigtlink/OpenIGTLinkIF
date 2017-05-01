@@ -28,7 +28,7 @@
 #include <vtkMRMLStorageNode.h>
 #include <vtkMRMLScene.h>
 
-
+#include <vtkCallbackCommand.h>
 
 class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : public vtkMRMLNode
 {
@@ -195,7 +195,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   NodeInfoMapType IncomingMRMLNodeInfoMap;
   
   igtlio::DeviceFactoryPointer LocalDeviceFactory;
-
+  
+  unsigned long NewDeviceEventObeserverTag;
+  
 };
 
 #endif
