@@ -189,6 +189,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   vtkSetStringMacro(OutgoingNodeReferenceMRMLAttributeName);
   vtkGetStringMacro(OutgoingNodeReferenceMRMLAttributeName);
   
+  std::string GetDeviceTypeFromMRMLNodeType(const char* type);
+  igtlio::DevicePointer GetDeviceByIGTLDeviceType(const char* type);
+  
   MessageDeviceListType MessageDeviceList;
   MessageDeviceMapType  IGTLNameToDeviceMap;
   
