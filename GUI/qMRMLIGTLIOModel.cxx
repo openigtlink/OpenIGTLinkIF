@@ -355,16 +355,21 @@ void qMRMLIGTLIOModel::updateIOTreeBranch(vtkMRMLIGTLConnectorNode* node, QStand
         QStandardItem* item2 = new QStandardItem;
         item2->setData("io"+QString(inode->GetID()), qMRMLSceneModel::UIDRole);
         item2->setFlags(Qt::ItemIsEnabled|Qt::ItemIsSelectable);
-          
-        igtlio::Device* device = node->MRMLIDToDeviceMap[inode->GetID()];
+        
+        igtlio::Device* device = NULL;
+        vtkMRMLIGTLConnectorNode::MessageDeviceMapType::iterator iter = node->MRMLNameToDeviceMap.find(inode->GetName());
+        if (iter != node->MRMLNameToDeviceMap.end())
+        {
+          device = iter->second;
+        }
         if (device)
-          {
+        {
           item2->setText(device->GetDeviceType().c_str());
-          }
+        }
         else
-          {
+        {
           item2->setText("--");
-          }
+        }
         items << item2;
 
         // Visibility icon

@@ -284,53 +284,77 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
     {
     return;
     }
-
-  if (index.column() == qMRMLIGTLIOModel::VisualizationColumn)
+  vtkSmartPointer<igtlio::Device> device = NULL;
+  if(dnode)
+  {
+    vtkMRMLIGTLConnectorNode::MessageDeviceMapType::iterator iter = cnode->MRMLNameToDeviceMap.find(dnode->GetName());
+    if (iter == cnode->MRMLNameToDeviceMap.end())
     {
+      igtlio::DeviceKeyType key;
+      key.name = dnode->GetName();
+      key.type = cnode->GetDeviceTypeFromMRMLNodeType(dnode->GetNodeTagName());
+      device = cnode->IOConnector->GetDevice(key);
+      if(device == NULL)
+      {
+        device = cnode->IOConnector->GetDeviceFactory()->create(key.type, key.name);
+        cnode->IOConnector->AddDevice(device);
+      }
+      cnode->MRMLNameToDeviceMap[dnode->GetName()] = device;
+    }
+    else
+    {
+      device = cnode->MRMLNameToDeviceMap[dnode->GetName()];
+    }
+  }
+  if (index.column() == qMRMLIGTLIOModel::VisualizationColumn)
+  {
     //qMRMLSceneModel* sceneModel = qobject_cast<qMRMLSceneModel*>(d->SortFilterModel->sourceModel());
     //QStandardItem* item = sceneModel->itemFromIndex(d->SortFilterModel->mapToSource(index));
 
     if (dnode && type == TYPE_DATANODE)
-      {
+    {
       // Toggle the visibility
       const char * attr = dnode->GetAttribute("IGTLVisible");
       if (attr && strcmp(attr, "true") == 0)
-        {
-        dnode->SetAttribute("IGTLVisible", "false");
-        }
-      else
-        {
-        dnode->SetAttribute("IGTLVisible", "true");
-        }
-      cnode->InvokeEvent(igtlio::Connector::DeviceModifiedEvent);
-      }
-    emit ioTreeViewUpdated(type, cnode, dir, dnode);
-    }
-  else if (index.column() == qMRMLIGTLIOModel::PushOnConnectColumn)
-    {
-    if (dnode && type == TYPE_DATANODE && dir == igtlio::Connector::IO_OUTGOING)
       {
+        dnode->SetAttribute("IGTLVisible", "false");
+        device->SetVisibility(false);
+      }
+      else
+      {
+        dnode->SetAttribute("IGTLVisible", "true");
+        device->SetVisibility(true);
+      }
+      cnode->InvokeEvent(igtlio::Connector::DeviceModifiedEvent);
+    }
+    emit ioTreeViewUpdated(type, cnode, dir, dnode);
+  }
+  else if (index.column() == qMRMLIGTLIOModel::PushOnConnectColumn)
+  {
+    if (dnode && type == TYPE_DATANODE && dir == igtlio::Connector::IO_OUTGOING)
+    {
       // Toggle the checkbox for "push on connect" feature
       const char * attr = dnode->GetAttribute("OpenIGTLinkIF.pushOnConnect");
       if (attr && strcmp(attr, "true") == 0)
-        {
+      {
         dnode->SetAttribute("OpenIGTLinkIF.pushOnConnect", "false");
-        }
-      else
-        {
-        dnode->SetAttribute("OpenIGTLinkIF.pushOnConnect", "true");
-        }
-      cnode->InvokeEvent(igtlio::Connector::DeviceModifiedEvent);
+        device->SetPushOnConnect(false);
       }
-    emit ioTreeViewUpdated(type, cnode, dir, dnode);
+      else
+      {
+        dnode->SetAttribute("OpenIGTLinkIF.pushOnConnect", "true");
+        device->SetPushOnConnect(true);
+      }
+      cnode->InvokeEvent(igtlio::Connector::DeviceModifiedEvent);
     }
+    emit ioTreeViewUpdated(type, cnode, dir, dnode);
+  }
   else if (index != this->CurrentIndex)
-    {
+  {
     this->CurrentIndex = index;
     //emit connectorNodeUpdated(cnode, dir);
     emit ioTreeViewUpdated(type, cnode, dir, dnode);
-    }
-
+  }
 }
 
 

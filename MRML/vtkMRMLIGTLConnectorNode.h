@@ -76,7 +76,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   // Stop observing and remove MRML node for outgoing data.
   void UnregisterOutgoingMRMLNode(vtkMRMLNode* node);
   
-  void ProcessVTKObjectEvents( vtkObject *caller, unsigned long event, void *callData );
+  void ProcessIncomingVTKObjectEvents( vtkObject *caller, unsigned long event, void *callData );
   
   // Description:
   // Register MRML node for incoming data.
@@ -144,11 +144,15 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   
   igtlio::Connector* IOConnector;
   
+  std::string GetDeviceTypeFromMRMLNodeType(const char* type);
+  
+  igtlio::DevicePointer GetDeviceByIGTLDeviceKey(igtlio::DeviceKeyType key);
+  
   typedef std::map<std::string, igtlio::Connector::NodeInfoType>   NodeInfoMapType;
   
   typedef std::map<std::string, vtkSmartPointer <igtlio::Device> > MessageDeviceMapType;
   
-  MessageDeviceMapType  MRMLIDToDeviceMap;
+  MessageDeviceMapType  MRMLNameToDeviceMap;
 
 #ifndef __VTK_WRAP__
   //BTX
@@ -188,12 +192,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   vtkGetStringMacro(OutgoingNodeReferenceRole);
   vtkSetStringMacro(OutgoingNodeReferenceMRMLAttributeName);
   vtkGetStringMacro(OutgoingNodeReferenceMRMLAttributeName);
-  
-  std::string GetDeviceTypeFromMRMLNodeType(const char* type);
-  igtlio::DevicePointer GetDeviceByIGTLDeviceType(const char* type);
-  
-  MessageDeviceListType MessageDeviceList;
-  MessageDeviceMapType  IGTLNameToDeviceMap;
   
   NodeInfoMapType IncomingMRMLNodeInfoMap;
   
