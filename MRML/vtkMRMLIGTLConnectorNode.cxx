@@ -1583,18 +1583,27 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetIncomingMRMLNode(unsigned int i)
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLBase* vtkMRMLIGTLConnectorNode::GetConverterByMRMLTag(const char* tag)
 {
+  if (tag == NULL)
+    {
+    vtkErrorMacro("vtkMRMLIGTLConnectorNode::GetConverterByMRMLTag failed: invalid tag");
+    return NULL;
+    }
 
   MessageConverterListType::iterator iter;
   for (iter = this->MessageConverterList.begin();
        iter != this->MessageConverterList.end();
        iter ++)
     {
-    if(*iter)
+    if ((*iter) == NULL)
       {
-        for(int i = 0; (*iter)->GetAllMRMLNames().size(); i++)
+      continue;
+      }
+    std::vector<std::string> supportedMRMLNodeNames = (*iter)->GetAllMRMLNames();
+    for (int i = 0; i<supportedMRMLNodeNames.size(); i++)
+      {
+      if (supportedMRMLNodeNames[i].compare(tag) == 0)
         {
-          if ( strcmp((*iter)->GetAllMRMLNames()[i].c_str(), tag) == 0)
-            return *iter;
+        return *iter;
         }
       }
     }
