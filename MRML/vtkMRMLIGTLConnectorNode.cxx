@@ -1599,7 +1599,7 @@ vtkIGTLToMRMLBase* vtkMRMLIGTLConnectorNode::GetConverterByMRMLTag(const char* t
       continue;
       }
     std::vector<std::string> supportedMRMLNodeNames = (*iter)->GetAllMRMLNames();
-    for (int i = 0; i<supportedMRMLNodeNames.size(); i++)
+    for (unsigned int i = 0; i<supportedMRMLNodeNames.size(); i++)
       {
       if (supportedMRMLNodeNames[i].compare(tag) == 0)
         {
