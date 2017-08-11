@@ -171,9 +171,7 @@ int vtkIGTLToMRMLTrajectory::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNo
     *size = this->OutTrajectoryMsg->GetPackSize();
     *igtlMsg = (void*)this->OutTrajectoryMsg->GetPackPointer();
 
-    // BUG: The parameter is not necessary for this method
-    igtl::TrajectoryElement::Pointer dummy;
-    this->OutTrajectoryMsg->ClearTrajectoryElement(dummy);
+    this->OutTrajectoryMsg->ClearAllTrajectoryElements();
 
     return 1;
     }
