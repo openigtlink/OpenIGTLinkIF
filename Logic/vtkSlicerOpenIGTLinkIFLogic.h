@@ -80,26 +80,26 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
 
   static vtkSlicerOpenIGTLinkIFLogic *New();
   vtkTypeMacro(vtkSlicerOpenIGTLinkIFLogic, vtkSlicerModuleLogic);
-  void PrintSelf(ostream&, vtkIndent);
+  void PrintSelf(ostream&, vtkIndent) VTK_OVERRIDE;
 
   /// The selected transform node is observed for TransformModified events and the transform
   /// data is copied to the slice nodes depending on the current mode
 
-  virtual void SetMRMLSceneInternal(vtkMRMLScene * newScene);
+  virtual void SetMRMLSceneInternal(vtkMRMLScene * newScene) VTK_OVERRIDE;
 
-  virtual void RegisterNodes();
+  virtual void RegisterNodes() VTK_OVERRIDE;
 
   //----------------------------------------------------------------
   // Events
   //----------------------------------------------------------------
 
-  virtual void OnMRMLSceneEndImport();
+  virtual void OnMRMLSceneEndImport() VTK_OVERRIDE;
 
-  virtual void OnMRMLSceneNodeAdded(vtkMRMLNode* /*node*/);
+  virtual void OnMRMLSceneNodeAdded(vtkMRMLNode* /*node*/) VTK_OVERRIDE;
 
-  virtual void OnMRMLSceneNodeRemoved(vtkMRMLNode* /*node*/);
+  virtual void OnMRMLSceneNodeRemoved(vtkMRMLNode* /*node*/) VTK_OVERRIDE;
 
-  virtual void OnMRMLNodeModified(vtkMRMLNode* /*node*/){}
+  virtual void OnMRMLNodeModified(vtkMRMLNode* /*node*/) VTK_OVERRIDE{}
 
   //----------------------------------------------------------------
   // Connector and converter Management
@@ -126,7 +126,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   // MRML Management
   //----------------------------------------------------------------
   
-  virtual void ProcessMRMLNodesEvents(vtkObject* caller, unsigned long event, void * callData);
+  virtual void ProcessMRMLNodesEvents(vtkObject* caller, unsigned long event, void * callData) VTK_OVERRIDE;
   //virtual void ProcessLogicEvents(vtkObject * caller, unsigned long event, void * callData);
 
   void ProcCommand(const char* nodeName, int size, unsigned char* data);

@@ -32,15 +32,15 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLStatus : public v
   static vtkIGTLToMRMLStatus *New();
   vtkTypeMacro(vtkIGTLToMRMLStatus,vtkObject);
 
-  void PrintSelf(ostream& os, vtkIndent indent);
+  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
 
-  virtual const char*  GetIGTLName() { return "STATUS"; };
-  virtual const char*  GetMRMLName() { return "IGTLStatus"; };
-  virtual vtkIntArray* GetNodeEvents();
-  virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name);
+  virtual const char*  GetIGTLName() VTK_OVERRIDE { return "STATUS"; };
+  virtual const char*  GetMRMLName() VTK_OVERRIDE { return "IGTLStatus"; };
+  virtual vtkIntArray* GetNodeEvents() VTK_OVERRIDE;
+  virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name) VTK_OVERRIDE;
 
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node);
-  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg);
+  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node) VTK_OVERRIDE;
+  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg) VTK_OVERRIDE;
 
 
  protected:

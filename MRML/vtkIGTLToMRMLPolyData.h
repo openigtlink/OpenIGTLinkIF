@@ -37,16 +37,16 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLPolyData : public
   static vtkIGTLToMRMLPolyData *New();
   vtkTypeMacro(vtkIGTLToMRMLPolyData,vtkObject);
 
-  void PrintSelf(ostream& os, vtkIndent indent);
+  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
 
-  virtual const char*  GetIGTLName() { return "POLYDATA"; };
-  virtual const char*  GetMRMLName() { return "Model"; };
-  virtual vtkIntArray* GetNodeEvents();
+  virtual const char*  GetIGTLName() VTK_OVERRIDE { return "POLYDATA"; };
+  virtual const char*  GetMRMLName() VTK_OVERRIDE { return "Model"; };
+  virtual vtkIntArray* GetNodeEvents() VTK_OVERRIDE;
   virtual vtkMRMLNode* CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name,
-                                                igtl::MessageBase::Pointer incomingPolyDataMessage);
+                                                igtl::MessageBase::Pointer incomingPolyDataMessage) VTK_OVERRIDE;
 
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node);
-  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg);
+  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node) VTK_OVERRIDE;
+  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg) VTK_OVERRIDE;
 
 
  protected:

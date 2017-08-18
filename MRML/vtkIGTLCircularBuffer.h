@@ -38,7 +38,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLCircularBuffer : public
   static vtkIGTLCircularBuffer *New();
   vtkTypeMacro(vtkIGTLCircularBuffer,vtkObject);
 
-  void PrintSelf(ostream& os, vtkIndent indent);
+  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
 
   int GetNumberOfBuffer() { return IGTLCB_CIRC_BUFFER_SIZE; }
 

@@ -37,10 +37,10 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLImage : public vt
   static vtkIGTLToMRMLImage *New();
   vtkTypeMacro(vtkIGTLToMRMLImage,vtkObject);
 
-  void PrintSelf(ostream& os, vtkIndent indent);
+  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
 
-  virtual const char*  GetIGTLName() { return "IMAGE"; };
-  virtual const char*  GetMRMLName()
+  virtual const char*  GetIGTLName() VTK_OVERRIDE { return "IMAGE"; };
+  virtual const char*  GetMRMLName() VTK_OVERRIDE
   {
     if(this->InImageMessage.IsNotNull())
     {
@@ -51,13 +51,13 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLImage : public vt
     }
     return "Volume";
   };
-  virtual vtkIntArray* GetNodeEvents();
-  virtual vtkMRMLNode* CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer incomingImageMessage);
+  virtual vtkIntArray* GetNodeEvents() VTK_OVERRIDE;
+  virtual vtkMRMLNode* CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer incomingImageMessage) VTK_OVERRIDE;
 
-  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer);
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node);
-  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg);
-  virtual std::vector<std::string>  GetAllMRMLNames()
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer) VTK_OVERRIDE;
+  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node) VTK_OVERRIDE;
+  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg) VTK_OVERRIDE;
+  virtual std::vector<std::string>  GetAllMRMLNames() VTK_OVERRIDE
   {
     this->MRMLNames.clear();
     this->MRMLNames.push_back("VectorVolume");
