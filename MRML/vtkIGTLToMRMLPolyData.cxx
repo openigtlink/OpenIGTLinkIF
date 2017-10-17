@@ -402,9 +402,9 @@ int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode
     {
     return 0;
     }
-
+  bool isMRMLSupported = this->CheckIfMRMLSupported(mrmlNode->GetNodeTagName());
   // If mrmlNode is PolyData node
-  if (event == vtkMRMLModelNode::PolyDataModifiedEvent && strcmp(mrmlNode->GetNodeTagName(), "Model") == 0)
+  if (event == vtkMRMLModelNode::PolyDataModifiedEvent && isMRMLSupported)
     {
     vtkMRMLModelNode* modelNode =
       vtkMRMLModelNode::SafeDownCast(mrmlNode);

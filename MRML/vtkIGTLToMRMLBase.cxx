@@ -131,3 +131,18 @@ int vtkIGTLToMRMLBase::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode
   return 0;
 }
 
+bool vtkIGTLToMRMLBase::CheckIfMRMLSupported(const char* nodeTagName)
+{
+  bool isMRMLSupported = false;
+  for (int iName = 0; iName < this->GetAllMRMLNames().size(); iName++)
+    {
+    if (strcmp(nodeTagName, this->GetAllMRMLNames()[iName].c_str()) == 0)
+      {
+      isMRMLSupported = true;
+      break;
+      }
+    }
+  return isMRMLSupported;
+}
+
+

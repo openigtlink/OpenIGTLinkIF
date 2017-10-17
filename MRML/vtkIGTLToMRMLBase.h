@@ -148,6 +148,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   int CheckCRC;
 
   vtkIGTLToMRMLBasePrivate* Private;
+  
+  bool CheckIfMRMLSupported(const char* nodeTagName);
 };
 
 

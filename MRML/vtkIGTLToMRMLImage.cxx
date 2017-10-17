@@ -580,9 +580,9 @@ int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
     {
     return 0;
     }
-
+  bool isMRMLSupported = this->CheckIfMRMLSupported(mrmlNode->GetNodeTagName());
   // If mrmlNode is Image node
-  if (event == vtkMRMLVolumeNode::ImageDataModifiedEvent && strcmp(mrmlNode->GetNodeTagName(), "Volume") == 0)
+  if (event == vtkMRMLVolumeNode::ImageDataModifiedEvent && isMRMLSupported)
     {
     vtkMRMLVolumeNode* volumeNode =
       vtkMRMLVolumeNode::SafeDownCast(mrmlNode);
