@@ -50,6 +50,7 @@
 
 #include "vtkSlicerOpenIGTLinkIFLogic.h"
 
+
 //---------------------------------------------------------------------------
 vtkStandardNewMacro(vtkIGTLToMRMLPolyData);
 //---------------------------------------------------------------------------
@@ -78,8 +79,45 @@ vtkMRMLNode* vtkIGTLToMRMLPolyData::CreateNewNodeWithMessage(vtkMRMLScene* scene
     vtkErrorMacro("Unable to create MRML node from incoming POLYDATA message: incoming PolyDataMessage is invalid");
     return 0;
     }
-
-
+  igtl::PolyDataMessage::Pointer polyMsg = igtl::PolyDataMessage::New();
+  // Attribute
+  polyMsg->Copy(incomingPolyDataMessage);
+  int c = polyMsg->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
+    {
+    vtkErrorMacro("Unable to create MRML node from incoming IMAGE message. Failed to unpack the message");
+    return 0;
+    }
+  bool isTensorData = false;
+  int nAttributes = polyMsg->GetNumberOfAttributes();
+  for (int i = 0; i < nAttributes; i ++)
+    {
+    igtl::PolyDataAttribute::Pointer attribute;
+    attribute = polyMsg->GetAttribute(i);
+    
+    // NOTE: Data types for POINT (igtl::PolyDataMessage::POINT_*) and CELL
+    // (igtl::PolyDataMessage::CELL_*) have the same lower 4 bit.
+    // By masking the values with 0x0F, attribute types (either SCALAR, VECTOR, NORMAL,
+    // TENSOR, or RGBA) can be obtained. On the other hand, by masking the value
+    // with 0xF0, data types (POINT or CELL) can be obtained.
+    // See, igtlPolyDataMessage.h in the OpenIGTLink library.
+    if ((attribute->GetType() & 0x0F ) == igtl::PolyDataAttribute::POINT_TENSOR)
+      {
+      isTensorData = true;
+      break;
+      }
+    }
+  if (isTensorData)
+    {
+      vtkMRMLNode* node = scene->CreateNodeByClass("vtkMRMLFiberBundleNode");
+      if (node)
+        {
+        vtkMRMLModelNode* fiberNode = vtkMRMLModelNode::SafeDownCast(node);
+        fiberNode->SetScene(scene);
+        fiberNode->CreateDefaultDisplayNodes();
+        return fiberNode;
+        }
+    }
   // Create a node
   vtkSmartPointer<vtkMRMLModelNode> modelNode = vtkSmartPointer<vtkMRMLModelNode>::New();
   modelNode->SetName(name);
@@ -126,44 +164,46 @@ vtkIntArray* vtkIGTLToMRMLPolyData::GetNodeEvents()
   return events;
 }
 
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLPolyData::UnpackIGTLMessage(igtl::MessageBase::Pointer buffer)
+{
+  if (this->InPolyDataMessage.IsNull())
+    {
+    this->InPolyDataMessage = igtl::PolyDataMessage::New();
+    }
+  this->InPolyDataMessage->Copy(buffer);
+  
+  // Deserialize the transform data
+  // If CheckCRC==0, CRC check is skipped.
+  int c = this->InPolyDataMessage->Unpack(this->CheckCRC);
+  
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
+    {
+    // TODO: error handling
+    return 0;
+    }
+  return 1;
+}
+
 
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
 {
-
-  vtkMRMLModelNode* modelNode = vtkMRMLModelNode::SafeDownCast(node);
-
-  if (modelNode==NULL)
+  if(this->InPolyDataMessage.IsNull())
     {
-    vtkErrorMacro("vtkIGTLToMRMLPolyData::IGTLToMRML failed: invalid node");
-    return 0;
+    this->UnpackIGTLMessage(buffer);
     }
-
-
-  // Create a message buffer to receive image data
-  igtl::PolyDataMessage::Pointer polyDataMsg;
-  polyDataMsg = igtl::PolyDataMessage::New();
-  polyDataMsg->Copy(buffer); // !! TODO: copy makes performance issue.
-
-  // Deserialize the data
-  // If CheckCRC==0, CRC check is skipped.
-  int c = polyDataMsg->Unpack(this->CheckCRC);
-
-  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
-    {
-    vtkErrorMacro("Unable to create MRML node from incoming POLYDATA message. Failed to unpack the message");
-    return 0;
-    }
-
+      
   vtkSmartPointer<vtkPolyData> poly = vtkSmartPointer<vtkPolyData>::New();
 
   if (poly.GetPointer()==NULL)
     {
     // TODO: Error handling
+    return 0;
     }
 
   // Points
-  igtl::PolyDataPointArray::Pointer pointsArray = polyDataMsg->GetPoints();
+  igtl::PolyDataPointArray::Pointer pointsArray = this->InPolyDataMessage->GetPoints();
   int npoints = pointsArray->GetNumberOfPoints();
   if (npoints > 0)
     {
@@ -182,7 +222,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Vertices
-  igtl::PolyDataCellArray::Pointer verticesArray =  polyDataMsg->GetVertices();
+  igtl::PolyDataCellArray::Pointer verticesArray =  this->InPolyDataMessage->GetVertices();
   int nvertices = verticesArray.IsNotNull() ? verticesArray->GetNumberOfCells() : 0;
   if (nvertices > 0)
     {
@@ -205,7 +245,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Lines
-  igtl::PolyDataCellArray::Pointer linesArray = polyDataMsg->GetLines();
+  igtl::PolyDataCellArray::Pointer linesArray = this->InPolyDataMessage->GetLines();
   int nlines = linesArray.IsNotNull() ? linesArray->GetNumberOfCells() : 0;
   if (nlines > 0)
     {
@@ -230,7 +270,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Polygons
-  igtl::PolyDataCellArray::Pointer polygonsArray = polyDataMsg->GetPolygons();
+  igtl::PolyDataCellArray::Pointer polygonsArray = this->InPolyDataMessage->GetPolygons();
   int npolygons = polygonsArray.IsNotNull() ? polygonsArray->GetNumberOfCells() : 0;
   if (npolygons > 0)
     {
@@ -255,7 +295,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Triangle Strips
-  igtl::PolyDataCellArray::Pointer triangleStripsArray = polyDataMsg->GetTriangleStrips();
+  igtl::PolyDataCellArray::Pointer triangleStripsArray = this->InPolyDataMessage->GetTriangleStrips();
   int ntstrips = triangleStripsArray.IsNotNull() ? triangleStripsArray->GetNumberOfCells() : 0;
   if (ntstrips > 0)
     {
@@ -278,13 +318,12 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
       }
     poly->SetStrips(tstripCells);
     }
-
   // Attribute
-  int nAttributes = polyDataMsg->GetNumberOfAttributes();
+  int nAttributes = this->InPolyDataMessage->GetNumberOfAttributes();
   for (int i = 0; i < nAttributes; i ++)
     {
     igtl::PolyDataAttribute::Pointer attribute;    
-    attribute = polyDataMsg->GetAttribute(i);
+    attribute = this->InPolyDataMessage->GetAttribute(i);
 
     vtkSmartPointer<vtkFloatArray> data = 
       vtkSmartPointer<vtkFloatArray>::New();
@@ -339,13 +378,18 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
       poly->GetCellData()->AddArray(data);
       }
     }
-
-
+ 
+  vtkMRMLModelNode* modelNode = vtkMRMLModelNode::SafeDownCast(node);
+  if (modelNode==NULL)
+    {
+    vtkErrorMacro("vtkIGTLToMRMLPolyData::IGTLToMRML failed: invalid node");
+    return 0;
+    }
+  
   modelNode->SetAndObservePolyData(poly);
-
+  
   poly->Modified();
   modelNode->Modified();
-
   return 1;
 
 }
