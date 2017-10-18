@@ -140,9 +140,6 @@ void qMRMLIGTLConnectorTreeView::mouseMoveEvent(QMouseEvent* e)
 {
   this->QTreeView::mouseMoveEvent(e);
 
-  // get the index of the current column
-  QModelIndex index = indexAt(e->pos());
-
   //if (index.column() == qMRMLSceneIGTLConnectorModel::VisibilityColumn || index.column() == qMRMLSceneIGTLConnectorModel::LockColumn || index.column() == qMRMLSceneIGTLConnectorModel::EditColumn)
   //  {
   //  // we are over a column with a clickable icon

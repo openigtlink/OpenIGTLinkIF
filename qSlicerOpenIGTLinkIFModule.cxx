@@ -13,9 +13,10 @@
 ==========================================================================*/
 
 // Qt includes
-#include <QtPlugin>
 #include <QTimer>
 
+
+//-----------------------------------------------------------------------------
 #include "qSlicerCoreApplication.h"
 
 // OpenIGTLinkIF MRML includes
@@ -29,8 +30,11 @@
 
 
 //-----------------------------------------------------------------------------
+#include <QtGlobal>
+#if (QT_VERSION < QT_VERSION_CHECK(5, 0, 0))
+#include <QtPlugin>
 Q_EXPORT_PLUGIN2(qSlicerOpenIGTLinkIFModule, qSlicerOpenIGTLinkIFModule);
-
+#endif
 //-----------------------------------------------------------------------------
 /// \ingroup Slicer_QtModules_OpenIGTLinkIF
 class qSlicerOpenIGTLinkIFModulePrivate
