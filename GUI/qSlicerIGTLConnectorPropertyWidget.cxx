@@ -51,6 +51,8 @@ void qSlicerIGTLConnectorPropertyWidgetPrivate::init()
                    q, SLOT(updateIGTLConnectorNode()));
   QObject::connect(&this->ConnectorTypeButtonGroup, SIGNAL(buttonClicked(int)),
                    q, SLOT(updateIGTLConnectorNode()));
+  QObject::connect(this->UseProtocolV2CheckBox, SIGNAL(toggled(bool)),
+                   q, SLOT(updateIGTLConnectorNode()));
 
   this->ConnectorNotDefinedRadioButton->setVisible(false);
   this->ConnectorTypeButtonGroup.addButton(this->ConnectorNotDefinedRadioButton, vtkMRMLIGTLConnectorNode::TYPE_NOT_DEFINED);
@@ -209,7 +211,7 @@ void qSlicerIGTLConnectorPropertyWidget::updateIGTLConnectorNode()
                                       vtkMRMLIGTLConnectorNode::PERSISTENT_ON :
                                       vtkMRMLIGTLConnectorNode::PERSISTENT_OFF);
   d->IGTLConnectorNode->SetLogErrorIfServerConnectionFailed(d->LogConnectionErrorCheckBox->isChecked());
-
+  d->IGTLConnectorNode->SetUseProtocolV2(d->UseProtocolV2CheckBox->isChecked());
   d->IGTLConnectorNode->DisableModifiedEventOff();
   d->IGTLConnectorNode->InvokePendingModifiedEvent();
 }

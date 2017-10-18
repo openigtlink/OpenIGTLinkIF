@@ -1684,7 +1684,7 @@ int vtkMRMLIGTLConnectorNode::PushNode(vtkMRMLNode* node, int event)
     events->Delete();
     }
 
-  if (converter->MRMLToIGTL(e, node, &size, &igtlMsg))
+  if (converter->MRMLToIGTL(e, node, &size, &igtlMsg,this->UseProtocolV2))
     {
     int r = this->SendData(size, (unsigned char*)igtlMsg);
     if (r == 0)

@@ -66,6 +66,13 @@
           </property>
          </widget>
         </item>
+        <item>
+          <widget class="QCheckBox" name="UseProtocolV2CheckBox">
+            <property name="text">
+            <string>UseProtocolV2</string>
+            </property>
+          </widget>
+        </item>
        </layout>
       </item>
       <item row="2" column="0">
