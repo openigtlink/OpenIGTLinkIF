@@ -34,14 +34,17 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLLabelMetaList : p
   void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
 
   virtual const char*  GetIGTLName() VTK_OVERRIDE { return "LBMETA"; };
-  virtual const char*  GetMRMLName() VTK_OVERRIDE { return "LabelMetaList"; };
-
+	virtual std::vector<std::string>  GetAllMRMLNames() VTK_OVERRIDE
+  {
+    this->MRMLNames.clear();
+    this->MRMLNames.push_back("LabelMetaList");
+    return this->MRMLNames;
+  }
   virtual vtkIntArray* GetNodeEvents() VTK_OVERRIDE;
-  virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name) VTK_OVERRIDE;
-
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node) VTK_OVERRIDE;
+  
+  virtual int          IGTLToMRML(vtkMRMLNode* node) VTK_OVERRIDE;
   virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg) VTK_OVERRIDE;
-
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer) VTK_OVERRIDE;
 
  protected:
   vtkIGTLToMRMLLabelMetaList();
@@ -50,7 +53,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLLabelMetaList : p
   void CenterLabel(vtkMRMLVolumeNode *volumeNode);
 
  protected:
-
+  igtl::LabelMetaMessage::Pointer InLabelMetaMsg;
   //igtl::TransformMessage::Pointer OutTransformMsg;
   igtl::LabelMetaMessage::Pointer OutLabelMetaMsg;
   igtl::GetLabelMetaMessage::Pointer GetLabelMetaMessage;

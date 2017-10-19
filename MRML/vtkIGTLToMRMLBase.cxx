@@ -72,7 +72,6 @@ vtkIGTLToMRMLBase::vtkIGTLToMRMLBase()
 {
   this->CheckCRC = 1;
   this->Private = new vtkIGTLToMRMLBasePrivate;
-  this->IncommingMSGFactory = igtl::MessageFactory::New();
 }
 
 //---------------------------------------------------------------------------
@@ -115,58 +114,23 @@ vtkSlicerOpenIGTLinkIFLogic* vtkIGTLToMRMLBase::GetOpenIGTLinkIFLogic()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLBase::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+vtkMRMLNode* vtkIGTLToMRMLBase::CreateMRMLNodeBaseOnTagName(vtkMRMLScene* scene)
 {
-  if(buffer && node)
+  if (this->mrmlNodeTagName.c_str())
     {
-      igtlUint32 second;
-      igtlUint32 nanosecond;
-      
-      buffer->GetTimeStamp(&second, &nanosecond);
-      
-      std::stringstream ss;
-      ss << second << nanosecond;
-      
-      node->SetAttribute("Timestamp",ss.str().c_str());
-    }
-  return 0;
-}
-
-//---------------------------------------------------------------------------
-int vtkIGTLToMRMLBase::UnpackIGTLMessage(igtl::MessageBase::Pointer buffer)
-{
-  igtl::MessageBase::Pointer message = this->IncommingMSGFactory->CreateReceiveMessage(buffer);
-  
-  message->Copy(buffer);
-  
-  // Deserialize the transform data
-  // If CheckCRC==0, CRC check is skipped.
-  int c = message->Unpack(this->CheckCRC);
-  
-  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
-    {
-    // TODO: error handling
-    return 0;
-    }
-  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
-    {
-    this->MessageIsVersion2 = true;
-    if(message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeName))
+    if(this->CheckIfMRMLSupported(this->mrmlNodeTagName.c_str()))
       {
-      this->MetaInfoAvail = true;
+      std::string className = scene->GetClassNameByTag(this->mrmlNodeTagName.c_str());
+      vtkMRMLNode* node = scene->CreateNodeByClass(className.c_str());
+      return node;
       }
     else
       {
-      this->MetaInfoAvail = false;
+      return NULL;
       }
     }
-  else if (message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
-    {
-    this->MessageIsVersion2 = false;
-    }
-  return 1;
+  return NULL;
 }
-
 
 bool vtkIGTLToMRMLBase::CheckIfMRMLSupported(const char* nodeTagName)
 {
@@ -182,3 +146,15 @@ bool vtkIGTLToMRMLBase::CheckIfMRMLSupported(const char* nodeTagName)
   return isMRMLSupported;
 }
 
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLBase::SetNodeTimeStamp(igtlUint32 second, igtlUint32 nanosecond, vtkMRMLNode* node)
+{
+  if(node)
+  {
+    std::stringstream ss;
+    ss << second << nanosecond;
+    
+    node->SetAttribute("Timestamp",ss.str().c_str());
+  }
+  return 0;
+}

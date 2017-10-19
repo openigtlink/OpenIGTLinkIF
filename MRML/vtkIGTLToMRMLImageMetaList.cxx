@@ -38,6 +38,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLImageMetaList);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLImageMetaList::vtkIGTLToMRMLImageMetaList()
 {
+  this->InImageMetaMessage = igtl::ImageMetaMessage::New();
+  this->mrmlNodeTagName = "ImageMetaList";
 }
 
 //---------------------------------------------------------------------------
@@ -52,18 +54,6 @@ void vtkIGTLToMRMLImageMetaList::PrintSelf(ostream& os, vtkIndent indent)
 }
 
 //---------------------------------------------------------------------------
-vtkMRMLNode* vtkIGTLToMRMLImageMetaList::CreateNewNode(vtkMRMLScene* scene, const char* name)
-{
-  vtkMRMLImageMetaListNode *imetaNode = vtkMRMLImageMetaListNode::New();
-  imetaNode->SetName(name);
-  imetaNode->SetDescription("Received by OpenIGTLink");
-
-  scene->AddNode(imetaNode);
-  imetaNode->Delete();
-  return imetaNode;
-}
-
-//---------------------------------------------------------------------------
 vtkIntArray* vtkIGTLToMRMLImageMetaList::GetNodeEvents()
 {
   vtkIntArray* events;
@@ -74,31 +64,50 @@ vtkIntArray* vtkIGTLToMRMLImageMetaList::GetNodeEvents()
   return events;
 }
 
+
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLImageMetaList::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLImageMetaList::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  if (strcmp(node->GetNodeTagName(), "ImageMetaList") != 0)
-    {
-    //std::cerr << "Invalid node!!!!" << std::endl;
-    return 0;
-    }
-
-  vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
-
-  // Create a message buffer to receive image meta data
-  igtl::ImageMetaMessage::Pointer imgMeta;
-  imgMeta = igtl::ImageMetaMessage::New();
-  imgMeta->Copy(buffer); // !! TODO: copy makes performance issue.
-
-  // Deserialize the image meta data
+  this->InImageMetaMessage->Copy(message);
+  
+  // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.
-  int c = imgMeta->Unpack(this->CheckCRC);
-
+  int c = this->InImageMetaMessage->Unpack(this->CheckCRC);
   if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
     // TODO: error handling
     return 0;
     }
+  this->mrmlNodeTagName = "";
+  if (message.IsNull()) // if CRC check fails
+    {
+    // TODO: error handling
+    return 0;
+    }
+  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
+    {
+    message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
+    }
+  else if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+    {
+    this->mrmlNodeTagName = "ImageMetaList";
+    }
+  return 1;
+}
+
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLImageMetaList::IGTLToMRML(vtkMRMLNode* node)
+{
+  if (strcmp(node->GetNodeTagName(), this->GetMRMLName()) != 0)
+    {
+    //std::cerr << "Invalid node!!!!" << std::endl;
+    return 0;
+    }
+  
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InImageMetaMessage->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
 
   if (node == NULL)
     {
@@ -113,11 +122,11 @@ int vtkIGTLToMRMLImageMetaList::IGTLToMRML(igtl::MessageBase::Pointer buffer, vt
 
   imetaNode->ClearImageMetaElement();
 
-  int nElements = imgMeta->GetNumberOfImageMetaElement();
+  int nElements = this->InImageMetaMessage->GetNumberOfImageMetaElement();
   for (int i = 0; i < nElements; i ++)
     {
     igtl::ImageMetaElement::Pointer imgMetaElement;
-    imgMeta->GetImageMetaElement(i, imgMetaElement);
+    this->InImageMetaMessage->GetImageMetaElement(i, imgMetaElement);
 
     igtlUint16 size[3];
     imgMetaElement->GetSize(size);

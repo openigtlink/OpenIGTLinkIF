@@ -1058,7 +1058,7 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
           if ((inIter->second).lock == 0)
             {
             node->DisableModifiedEventOn();
-            converter->IGTLToMRML(buffer, node);
+            converter->IGTLToMRML(node);
             // Save OpenIGTLink time stamp
             igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
             buffer->GetTimeStamp(ts);
@@ -1103,7 +1103,7 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
               vtkMRMLNode* node = converter->CreateNewNodeWithMessage(this->GetScene(), buffer->GetDeviceName(), buffer);
               NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
               node->DisableModifiedEventOn();
-              converter->IGTLToMRML(buffer, node);
+              converter->IGTLToMRML(node);
 
               // Save OpenIGTLink time stamp
               igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
@@ -1124,7 +1124,7 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
                 vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(collection->GetItemAsObject(i));
                 NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
                 node->DisableModifiedEventOn();
-                converter->IGTLToMRML(buffer, node);
+                converter->IGTLToMRML(node);
 
                 // Save OpenIGTLink time stamp
                 // TODO: avoid calling New() every time.

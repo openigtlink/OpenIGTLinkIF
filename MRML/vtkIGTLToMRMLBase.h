@@ -64,16 +64,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
 
   // IGTL Device / MRML Tag names
   virtual const char*  GetIGTLName()      { return NULL;};
-  virtual const char*  GetMRMLName()      { return NULL;};
+  virtual const char*  GetMRMLName()      { return this->mrmlNodeTagName.c_str();};
   virtual std::vector<std::string>  GetAllMRMLNames()
   {
-    if(this->MRMLNames.size() == 0)
-    {
-      if(GetMRMLName())
-      {
-        this->MRMLNames.push_back(GetMRMLName());
-      }
-    }
     return this->MRMLNames;
   }
   virtual unsigned int GetNumOfMRMLName(){GetAllMRMLNames();return this->MRMLNames.size();};
@@ -91,20 +84,22 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   virtual vtkIntArray* GetNodeEvents()    { return NULL; };
 
   // This simpler call exists when the message is not available to provide more information in the function
-  virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* vtkNotUsed(scene), const char* vtkNotUsed(name), const char* vtkNotUsed(mrmlNodeName)=NULL)
-  { return NULL; };
+  virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name)
+  {
+    vtkMRMLNode* node = this->CreateMRMLNodeBaseOnTagName(scene);
+    node->SetName(name);
+    node->SetDescription("Received by OpenIGTLink");
+    return node;
+  }
   // This call enables the created node to query the message to determine any necessary properties
   virtual vtkMRMLNode* CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer message)
   {
-    if (MessageIsVersion2 && MetaInfoAvail)
+    vtkMRMLNode* node = NULL;
+    if(this->UnpackIGTLMessage(message))
       {
-      return this->CreateNewNode(scene, name, mrmlNodeName.c_str());
+      node= this->CreateNewNode(scene, name);
       }
-    else
-      {
-      return this->CreateNewNode(scene, name);
-      }
-    return NULL;
+    return node;
   };
 
   // for TYPE_MULTI_IGTL_NAMES
@@ -114,13 +109,15 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // Description:
   // Functions to de-serialize (unpack) the OpenIGTLink message and store in the class instance.
   // The de-serialized message must be deleted in IGTLToMRML()
-  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer);
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer){return 0;};
+  
+  // Check meta information for creating mrmlnode
+  //virtual int          CheckMetaInfo(igtl::MessageBase::Pointer message);
   
   // Description:
   // Functions to convert OpenIGTLink message to MRML node.
   // If mrmlNode is QueryNode, the function will generate query node. (event is not used.)
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer,
-                                  vtkMRMLNode* node);
+  virtual int          IGTLToMRML(vtkMRMLNode* node) {return 0;};
   
   virtual int          MRMLToIGTL(unsigned long vtkNotUsed(event), vtkMRMLNode* vtkNotUsed(mrmlNode),
                                   int* vtkNotUsed(size), void** vtkNotUsed(igtlMsg)){return 0;}
@@ -129,7 +126,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // If mrmlNode is QueryNode, the function will generate query node. (event is not used.)
   virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode,
                                   int* size, void** igtlMsg, bool useProtocolV2){ return MRMLToIGTL(event, mrmlNode, size, igtlMsg); }
-
+  // create a memlnode in the given scene base on the current mrmlNodeTagName.
+  vtkMRMLNode* CreateMRMLNodeBaseOnTagName(vtkMRMLScene* scene);
+  
   // Check query que (called periodically by timer)
   // (implemeted only if ncessary)
   virtual int CheckQueryQue(double vtkNotUsed(ctime)) { return true; }
@@ -148,12 +147,16 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   virtual void SetVisibility(int vtkNotUsed(sw),
                              vtkMRMLScene * vtkNotUsed(scene),
                              vtkMRMLNode * vtkNotUsed(node)) {};
+  
+  bool CheckIfMRMLSupported(const char* nodeTagName);
 
  protected:
   vtkIGTLToMRMLBase();
   ~vtkIGTLToMRMLBase();
 
  protected:
+  
+  int SetNodeTimeStamp(igtlUint32 second, igtlUint32 nanosecond, vtkMRMLNode* node);
 
   // list of IGTL names (used only when the class supports multiple IGTL names)
   std::vector<std::string>  IGTLNames;
@@ -163,14 +166,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   int CheckCRC;
 
   vtkIGTLToMRMLBasePrivate* Private;
-  
-  bool MessageIsVersion2 = false;
-  bool MetaInfoAvail = false;
-  std::string mrmlNodeName = "";
-  
-  igtl::MessageFactory::Pointer IncommingMSGFactory;
-  
-  bool CheckIfMRMLSupported(const char* nodeTagName);
+
+  std::string mrmlNodeTagName = "";
 };
 
 

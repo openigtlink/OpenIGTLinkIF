@@ -33,6 +33,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLStatus);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLStatus::vtkIGTLToMRMLStatus()
 {
+  this->InStatusMsg = igtl::StatusMessage::New();
+  this->mrmlNodeTagName = "IGTLStatus";
 }
 
 //---------------------------------------------------------------------------
@@ -47,21 +49,6 @@ void vtkIGTLToMRMLStatus::PrintSelf(ostream& os, vtkIndent indent)
 }
 
 //---------------------------------------------------------------------------
-vtkMRMLNode* vtkIGTLToMRMLStatus::CreateNewNode(vtkMRMLScene* scene, const char* name)
-{
-  vtkMRMLIGTLStatusNode* statusNode;
-
-  statusNode = vtkMRMLIGTLStatusNode::New();
-  statusNode->SetName(name);
-  statusNode->SetDescription("Received by OpenIGTLink");
-
-  vtkMRMLNode* n = scene->AddNode(statusNode);
-  statusNode->Delete();
-
-  return n;
-}
-
-//---------------------------------------------------------------------------
 vtkIntArray* vtkIGTLToMRMLStatus::GetNodeEvents()
 {
   vtkIntArray* events;
@@ -72,26 +59,31 @@ vtkIntArray* vtkIGTLToMRMLStatus::GetNodeEvents()
   return events;
 }
 
+
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLStatus::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLStatus::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
-
-  // Create a message buffer to receive transform data
-  igtl::StatusMessage::Pointer statusMsg;
-  statusMsg = igtl::StatusMessage::New();
-  statusMsg->Copy(buffer);  // !! TODO: copy makes performance issue.
-
+  this->InStatusMsg->Copy(message);
+  
   // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.
-  int c = statusMsg->Unpack(this->CheckCRC);
-
-  if (!(c & igtl::MessageHeader::UNPACK_BODY)) // if CRC check fails
+  int c = this->InStatusMsg->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
     // TODO: error handling
     return 0;
     }
-
+  return 1;
+}
+  
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLStatus::IGTLToMRML(vtkMRMLNode* node)
+{
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InStatusMsg->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
+  
   if (node == NULL)
     {
     return 0;
@@ -100,8 +92,8 @@ int vtkIGTLToMRMLStatus::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNo
   vtkMRMLIGTLStatusNode* statusNode =
     vtkMRMLIGTLStatusNode::SafeDownCast(node);
 
-  statusNode->SetStatus(statusMsg->GetCode(), statusMsg->GetSubCode(),
-                        statusMsg->GetErrorName(), statusMsg->GetStatusString());
+  statusNode->SetStatus(this->InStatusMsg->GetCode(), this->InStatusMsg->GetSubCode(),
+                        this->InStatusMsg->GetErrorName(), this->InStatusMsg->GetStatusString());
 
   return 1;
 }

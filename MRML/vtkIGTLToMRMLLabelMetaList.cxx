@@ -34,6 +34,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLLabelMetaList);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLLabelMetaList::vtkIGTLToMRMLLabelMetaList()
 {
+  this->InLabelMetaMsg = igtl::LabelMetaMessage::New();
+  this->mrmlNodeTagName = "LabelMetaList";
 }
 
 //---------------------------------------------------------------------------
@@ -48,18 +50,6 @@ void vtkIGTLToMRMLLabelMetaList::PrintSelf(ostream& os, vtkIndent indent)
 }
 
 //---------------------------------------------------------------------------
-vtkMRMLNode* vtkIGTLToMRMLLabelMetaList::CreateNewNode(vtkMRMLScene* scene, const char* name)
-{
-  vtkMRMLLabelMetaListNode *imetaNode = vtkMRMLLabelMetaListNode::New();
-  imetaNode->SetName(name);
-  imetaNode->SetDescription("Received by OpenIGTLink");
-
-  scene->AddNode(imetaNode);
-  imetaNode->Delete();
-  return imetaNode;
-}
-
-//---------------------------------------------------------------------------
 vtkIntArray* vtkIGTLToMRMLLabelMetaList::GetNodeEvents()
 {
   vtkIntArray* events;
@@ -70,31 +60,51 @@ vtkIntArray* vtkIGTLToMRMLLabelMetaList::GetNodeEvents()
   return events;
 }
 
+
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLLabelMetaList::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLLabelMetaList::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  if (strcmp(node->GetNodeTagName(), "LabelMetaList") != 0)
-    {
-    //std::cerr << "Invalid node!!!!" << std::endl;
-    return 0;
-    }
-
-  vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
-
-  // Create a message buffer to receive label meta data
-  igtl::LabelMetaMessage::Pointer lbMeta;
-  lbMeta = igtl::LabelMetaMessage::New();
-  lbMeta->Copy(buffer); // !! TODO: copy makes performance issue.
-
-  // Deserialize the label meta data
+  this->InLabelMetaMsg->Copy(message);
+  
+  // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.
-  int c = lbMeta->Unpack(this->CheckCRC);
-
+  int c = this->InLabelMetaMsg->Unpack(this->CheckCRC);
   if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
     // TODO: error handling
     return 0;
     }
+  this->mrmlNodeTagName = "";
+  if (message.IsNull()) // if CRC check fails
+    {
+    // TODO: error handling
+    return 0;
+    }
+  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
+    {
+    message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
+    }
+  else if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+    {
+    this->mrmlNodeTagName = "LabelMetaList";
+    }
+  return 1;
+}
+
+
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLLabelMetaList::IGTLToMRML(vtkMRMLNode* node)
+{
+  if (strcmp(node->GetNodeTagName(), this->GetMRMLName()) != 0)
+    {
+    //std::cerr << "Invalid node!!!!" << std::endl;
+    return 0;
+    }
+
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InLabelMetaMsg->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
 
   if (node == NULL)
     {
@@ -109,11 +119,11 @@ int vtkIGTLToMRMLLabelMetaList::IGTLToMRML(igtl::MessageBase::Pointer buffer, vt
 
   imetaNode->ClearLabelMetaElement();
 
-  int nElements = lbMeta->GetNumberOfLabelMetaElement();
+  int nElements = this->InLabelMetaMsg->GetNumberOfLabelMetaElement();
   for (int i = 0; i < nElements; i ++)
     {
     igtl::LabelMetaElement::Pointer lbMetaElement;
-    lbMeta->GetLabelMetaElement(i, lbMetaElement);
+    this->InLabelMetaMsg->GetLabelMetaElement(i, lbMetaElement);
 
     igtlUint16 size[3];
     lbMetaElement->GetSize(size);

@@ -30,7 +30,11 @@ vtkStandardNewMacro(vtkIGTLToMRMLPoints);
 
 
 //---------------------------------------------------------------------------
-vtkIGTLToMRMLPoints::vtkIGTLToMRMLPoints() {}
+vtkIGTLToMRMLPoints::vtkIGTLToMRMLPoints()
+{
+  this->InPointMsg = igtl::PointMessage::New();
+  this->mrmlNodeTagName = "MarkupsFiducial";
+}
 
 
 //---------------------------------------------------------------------------
@@ -41,21 +45,6 @@ vtkIGTLToMRMLPoints::~vtkIGTLToMRMLPoints() {}
 void vtkIGTLToMRMLPoints::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->vtkObject::PrintSelf(os, indent);
-}
-
-
-//---------------------------------------------------------------------------
-vtkMRMLNode* vtkIGTLToMRMLPoints::CreateNewNode(vtkMRMLScene* scene, const char* name)
-{
-  //vtkMRMLPointNode *node = vtkMRMLPointNode::New();
-  vtkMRMLMarkupsFiducialNode* node = vtkMRMLMarkupsFiducialNode::New();
-  
-  node->SetName(name);
-  node->SetDescription("Received by OpenIGTLink");
-
-  scene->AddNode(node);
-  node->Delete();
-  return node;
 }
 
 
@@ -72,86 +61,108 @@ vtkIntArray* vtkIGTLToMRMLPoints::GetNodeEvents()
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLPoints::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLPoints::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  if (strcmp(node->GetNodeTagName(), this->GetMRMLName()) != 0)
+  
+  this->InPointMsg->Copy(message);
+  
+  // Deserialize the transform data
+  // If CheckCRC==0, CRC check is skipped.
+  int c = this->InPointMsg->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
-    std::cerr << "Invalid node. NodeTagName: " << node->GetNodeTagName() << " MRMLName: " << this->GetMRMLName() << std::endl;
+    // TODO: error handling
     return 0;
     }
-
-  //------------------------------------------------------------
-  // Allocate Point Message Class
-  igtl::PointMessage::Pointer pointMsg;
-  pointMsg = igtl::PointMessage::New();
-  pointMsg->Copy(buffer);
-
-  // Deserialize the transform data
-  // If you want to skip CRC check, call Unpack() without argument.
-  int c = pointMsg->Unpack();
-  if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
+  this->mrmlNodeTagName = "";
+  if (message.IsNull()) // if CRC check fails
     {
-    //vtkMRMLPointNode* pmnode = vtkMRMLPointNode::SafeDownCast(node);
-    vtkMRMLMarkupsFiducialNode* mfnode = vtkMRMLMarkupsFiducialNode::SafeDownCast(node);
-    if (mfnode)
+    // TODO: error handling
+    return 0;
+    }
+  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
+    {
+    message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
+    }
+  else if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+    {
+    this->mrmlNodeTagName = "MarkupsFiducial";
+    }
+  return 1;
+}
+
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLPoints::IGTLToMRML(vtkMRMLNode* node)
+{
+  if (!this->CheckIfMRMLSupported(node->GetNodeTagName()))
+    {
+    std::cerr << "Invalid node. NodeTagName: " << node->GetNodeTagName()<< std::endl;
+    return 0;
+    }
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InPointMsg->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
+  //vtkMRMLPointNode* pmnode = vtkMRMLPointNode::SafeDownCast(node);
+  vtkMRMLMarkupsFiducialNode* mfnode = vtkMRMLMarkupsFiducialNode::SafeDownCast(node);
+  if (mfnode)
+    {
+    //mfnode->ClearPoint();
+    int modid = mfnode->StartModify();
+    int nElements = this->InPointMsg->GetNumberOfPointElement();
+
+    // Check the number of points in the MarkupsFiducialNode:
+    int nFiducials = mfnode->GetNumberOfFiducials();
+    
+    if (nElements > nFiducials)
       {
-      //mfnode->ClearPoint();
-      int modid = mfnode->StartModify();
-      int nElements = pointMsg->GetNumberOfPointElement();
-
-      // Check the number of points in the MarkupsFiducialNode:
-      int nFiducials = mfnode->GetNumberOfFiducials();
-      
-      if (nElements > nFiducials)
+      // Reduce the number of poitns in the Fiducial node
+      int nr = nElements - nFiducials;
+      for (int i = 0; i < nr; i ++)
         {
-        // Reduce the number of poitns in the Fiducial node
-        int nr = nElements - nFiducials;
-        for (int i = 0; i < nr; i ++)
-          {
-          mfnode->RemoveMarkup(0);
-          }
+        mfnode->RemoveMarkup(0);
         }
-
-      for (int i = 0; i < nElements; i ++)
-        {
-        igtl::PointElement::Pointer pointElement;
-        pointMsg->GetPointElement(i, pointElement);
-       
-        igtlUint8 rgba[4];
-        pointElement->GetRGBA(rgba);
-        
-        igtlFloat32 pos[3];
-        pointElement->GetPosition(pos);
-  
-        mfnode->SetAttribute("GroupName", pointElement->GetGroupName());
-        //mfnode->SetAttribute("Radius", pointElement->GetRadius());
-        //mfnode->SetAttribute("RGBA", rgba);
-        //mfnode->SetAttribute("Owner", pointElement->GetOwner());
-
-        if (i < nFiducials)
-          {
-          mfnode->SetNthFiducialPosition(i, (double)pos[0], (double)pos[1], (double)pos[2]);
-          mfnode->SetNthFiducialLabel(i, pointElement->GetName());
-          }
-        else
-          {
-          mfnode->AddFiducial((double)pos[0], (double)pos[1], (double)pos[2], pointElement->GetName());
-          }
-        
-        //std::cerr << "========== Element #" << i << " ==========" << std::endl;
-        //std::cerr << " Name      : " << pointElement->GetName() << std::endl;
-        //std::cerr << " GroupName : " << pointElement->GetGroupName() << std::endl;
-        //std::cerr << " RGBA      : ( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << " )" << std::endl;
-        //std::cerr << " Position  : ( " << std::fixed << pos[0] << ", " << pos[1] << ", " << pos[2] << " )" << std::endl;
-        //std::cerr << " Radius    : " << std::fixed << pointElement->GetRadius() << std::endl;
-        //std::cerr << " Owner     : " << pointElement->GetOwner() << std::endl;
-        //std::cerr << "================================" << std::endl;
-
-        }
-
-      mfnode->EndModify(modid);
-      mfnode->Modified();
       }
+
+    for (int i = 0; i < nElements; i ++)
+      {
+      igtl::PointElement::Pointer pointElement;
+      this->InPointMsg->GetPointElement(i, pointElement);
+     
+      igtlUint8 rgba[4];
+      pointElement->GetRGBA(rgba);
+      
+      igtlFloat32 pos[3];
+      pointElement->GetPosition(pos);
+
+      mfnode->SetAttribute("GroupName", pointElement->GetGroupName());
+      //mfnode->SetAttribute("Radius", pointElement->GetRadius());
+      //mfnode->SetAttribute("RGBA", rgba);
+      //mfnode->SetAttribute("Owner", pointElement->GetOwner());
+
+      if (i < nFiducials)
+        {
+        mfnode->SetNthFiducialPosition(i, (double)pos[0], (double)pos[1], (double)pos[2]);
+        mfnode->SetNthFiducialLabel(i, pointElement->GetName());
+        }
+      else
+        {
+        mfnode->AddFiducial((double)pos[0], (double)pos[1], (double)pos[2], pointElement->GetName());
+        }
+      
+      //std::cerr << "========== Element #" << i << " ==========" << std::endl;
+      //std::cerr << " Name      : " << pointElement->GetName() << std::endl;
+      //std::cerr << " GroupName : " << pointElement->GetGroupName() << std::endl;
+      //std::cerr << " RGBA      : ( " << (int)rgba[0] << ", " << (int)rgba[1] << ", " << (int)rgba[2] << ", " << (int)rgba[3] << " )" << std::endl;
+      //std::cerr << " Position  : ( " << std::fixed << pos[0] << ", " << pos[1] << ", " << pos[2] << " )" << std::endl;
+      //std::cerr << " Radius    : " << std::fixed << pointElement->GetRadius() << std::endl;
+      //std::cerr << " Owner     : " << pointElement->GetOwner() << std::endl;
+      //std::cerr << "================================" << std::endl;
+
+      }
+
+    mfnode->EndModify(modid);
+    mfnode->Modified();
     }
   return 1;
 
@@ -170,7 +181,7 @@ int vtkIGTLToMRMLPoints::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, 
   std::cerr << this->GetMRMLName() << std::endl;
   std::cerr << "event = " << event << std::endl;
 
-  if (strcmp(mrmlNode->GetNodeTagName(), this->GetMRMLName()) == 0 &&
+  if (this->CheckIfMRMLSupported(mrmlNode->GetNodeTagName()) &&
       (event == vtkMRMLMarkupsNode::LockModifiedEvent ||
        event == vtkMRMLMarkupsNode::LabelFormatModifiedEvent ||
        event == vtkMRMLMarkupsNode::PointModifiedEvent ||

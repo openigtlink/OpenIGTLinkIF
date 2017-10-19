@@ -38,6 +38,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLPosition);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLPosition::vtkIGTLToMRMLPosition()
 {
+  this->InPositionMsg = igtl::PositionMessage::New();
+  this->mrmlNodeTagName = "LinearTransform";
 }
 
 //---------------------------------------------------------------------------
@@ -84,25 +86,29 @@ vtkIntArray* vtkIGTLToMRMLPosition::GetNodeEvents()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLPosition::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLPosition::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
-
-  // Create a message buffer to receive transform data
-  igtl::PositionMessage::Pointer positionMsg;
-  positionMsg = igtl::PositionMessage::New();
-  positionMsg->Copy(buffer);  // !! TODO: copy makes performance issue.
-
+  this->InPositionMsg->Copy(message);
+  
   // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.
-  int c = positionMsg->Unpack(this->CheckCRC);
-
-  if (!(c & igtl::MessageHeader::UNPACK_BODY)) // if CRC check fails
+  int c = this->InPositionMsg->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
     // TODO: error handling
     return 0;
     }
+  return 1;
+}
 
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLPosition::IGTLToMRML(vtkMRMLNode* node)
+{
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InPositionMsg->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
+  
   if (node == NULL)
     {
     return 0;
@@ -114,8 +120,8 @@ int vtkIGTLToMRMLPosition::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
   float position[3];
   float quaternion[4];
   igtl::Matrix4x4 matrix;
-  positionMsg->GetPosition(position);
-  positionMsg->GetQuaternion(quaternion);
+  this->InPositionMsg->GetPosition(position);
+  this->InPositionMsg->GetQuaternion(quaternion);
 
   igtl::QuaternionToMatrix(quaternion, matrix);
 
