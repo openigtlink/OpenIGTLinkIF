@@ -54,7 +54,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLImage : public vt
   virtual vtkIntArray* GetNodeEvents() VTK_OVERRIDE;
   virtual vtkMRMLNode* CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer incomingImageMessage) VTK_OVERRIDE;
 
-  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer) VTK_OVERRIDE;
   virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node) VTK_OVERRIDE;
   virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode,int* size, void** igtlMsg, bool useProtocolV2) VTK_OVERRIDE;
   virtual std::vector<std::string>  GetAllMRMLNames() VTK_OVERRIDE

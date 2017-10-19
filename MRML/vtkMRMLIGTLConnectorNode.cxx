@@ -1038,98 +1038,74 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
     vtkMRMLNode* updatedNode = NULL;
 
     int found = 0;
-
-    // look up the incoming MRML node list
-    NodeInfoMapType::iterator inIter;
-    for (inIter = this->IncomingMRMLNodeInfoMap.begin();
-         inIter != this->IncomingMRMLNodeInfoMap.end();
-         inIter ++)
+    int unpackStatus = converter->UnpackIGTLMessage(buffer);
+    if(unpackStatus)
       {
-      //vtkMRMLNode* node = (*inIter).node;
-      //vtkMRMLNode* node = (inIter->second).node;
-      vtkMRMLNode* node = scene->GetNodeByID((inIter->first));
-      int unpackStatus = converter->UnpackIGTLMessage(buffer);
-      if (node && unpackStatus &&
-          strcmp(node->GetNodeTagName(), converter->GetMRMLName()) == 0 &&
-          strcmp(node->GetName(), (*nameIter).c_str()) == 0)
+      // look up the incoming MRML node list
+      NodeInfoMapType::iterator inIter;
+      for (inIter = this->IncomingMRMLNodeInfoMap.begin();
+           inIter != this->IncomingMRMLNodeInfoMap.end();
+           inIter ++)
         {
-        //if ((*inIter).lock == 0)
-        if ((inIter->second).lock == 0)
+        //vtkMRMLNode* node = (*inIter).node;
+        //vtkMRMLNode* node = (inIter->second).node;
+        vtkMRMLNode* node = scene->GetNodeByID((inIter->first));
+        if (node &&
+            strcmp(node->GetNodeTagName(), converter->GetMRMLName()) == 0 &&
+            strcmp(node->GetName(), (*nameIter).c_str()) == 0)
           {
-          node->DisableModifiedEventOn();
-          converter->IGTLToMRML(buffer, node);
-          // Save OpenIGTLink time stamp
-          igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
-          buffer->GetTimeStamp(ts);
-          //(*inIter).second = ts->GetSecond();
-          //(*inIter).nanosecond = ts->GetNanosecond();
-          (inIter->second).second = ts->GetSecond();
-          (inIter->second).nanosecond = ts->GetNanosecond();
-          //node->SetAttribute("IGTLTime", )
-          node->Modified();  // in case converter doesn't call any Modified()s
-          node->DisableModifiedEventOff();
-          node->InvokePendingModifiedEvent();
-          updatedNode = node;
-          }
-        found = 1;
-        break;
-        }
-      }
-
-    if (!found)
-      {
-      // If the incoming data is not restricted by name and type, search the scene as well.
-      if (!this->RestrictDeviceName)
-        {
-        int unpackStatus = converter->UnpackIGTLMessage(buffer);
-        if(unpackStatus)
-        {
-          const char* classname = scene->GetClassNameByTag(converter->GetMRMLName());
-          vtkCollection* collectiontemp = scene->GetNodesByClassByName(classname, buffer->GetDeviceName());
-          //----------------------
-          //GetNodesByClassByName() is buggy, vtkMRMLVectorVolumeNode.IsA("vtkMRMLScalarVolumeNode") == 1, so when ask for scalar volume, the collection contains a vector volume
-          vtkCollection* collection = vtkCollection::New();
-          for (int i = 0; i < collectiontemp->GetNumberOfItems(); i ++)
-          {
-            vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(collectiontemp->GetItemAsObject(i));
-            if(strcmp(node->GetClassName(),classname)==0)
+          //if ((*inIter).lock == 0)
+          if ((inIter->second).lock == 0)
             {
-              collection->AddItem(node);
-            }
-          }
-          //-----------------------
-          int nCol = collection->GetNumberOfItems();
-          if (nCol == 0)
-          {
-            // Call the advanced creation call first to see if the requested converter needs the message itself
-            vtkMRMLNode* node = converter->CreateNewNodeWithMessage(this->GetScene(), buffer->GetDeviceName(), buffer);
-            NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
             node->DisableModifiedEventOn();
             converter->IGTLToMRML(buffer, node);
-
             // Save OpenIGTLink time stamp
             igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
             buffer->GetTimeStamp(ts);
-            nodeInfo->second = ts->GetSecond();
-            nodeInfo->nanosecond = ts->GetNanosecond();
-
-            node->Modified();  // in case converter doesn't call any Modifieds itself
+            //(*inIter).second = ts->GetSecond();
+            //(*inIter).nanosecond = ts->GetNanosecond();
+            (inIter->second).second = ts->GetSecond();
+            (inIter->second).nanosecond = ts->GetNanosecond();
+            //node->SetAttribute("IGTLTime", )
+            node->Modified();  // in case converter doesn't call any Modified()s
             node->DisableModifiedEventOff();
             node->InvokePendingModifiedEvent();
             updatedNode = node;
-            this->InvokeEvent(vtkMRMLIGTLConnectorNode::NewDeviceEvent, node);
             }
-          else
+          found = 1;
+          break;
+          }
+        }
+
+      if (!found)
+        {
+        // If the incoming data is not restricted by name and type, search the scene as well.
+        if (!this->RestrictDeviceName)
+          {
+            const char* classname = scene->GetClassNameByTag(converter->GetMRMLName());
+            vtkCollection* collectiontemp = scene->GetNodesByClassByName(classname, buffer->GetDeviceName());
+            //----------------------
+            //GetNodesByClassByName() is buggy, vtkMRMLVectorVolumeNode.IsA("vtkMRMLScalarVolumeNode") == 1, so when ask for scalar volume, the collection contains a vector volume
+            vtkCollection* collection = vtkCollection::New();
+            for (int i = 0; i < collectiontemp->GetNumberOfItems(); i ++)
             {
-            for (int i = 0; i < nCol; i ++)
+              vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(collectiontemp->GetItemAsObject(i));
+              if(strcmp(node->GetClassName(),classname)==0)
               {
-              vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(collection->GetItemAsObject(i));
+                collection->AddItem(node);
+              }
+            }
+            //-----------------------
+            int nCol = collection->GetNumberOfItems();
+            if (nCol == 0)
+            {
+              // Call the advanced creation call first to see if the requested converter needs the message itself
+              vtkMRMLNode* node = converter->CreateNewNodeWithMessage(this->GetScene(), buffer->GetDeviceName(), buffer);
               NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
               node->DisableModifiedEventOn();
               converter->IGTLToMRML(buffer, node);
 
               // Save OpenIGTLink time stamp
-              // TODO: avoid calling New() every time.
               igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
               buffer->GetTimeStamp(ts);
               nodeInfo->second = ts->GetSecond();
@@ -1139,12 +1115,34 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
               node->DisableModifiedEventOff();
               node->InvokePendingModifiedEvent();
               updatedNode = node;
-              break;
-              // TODO: QueueNode supposes that there is only unique combination of type and node name,
-              // but it should be able to hold multiple nodes.
+              this->InvokeEvent(vtkMRMLIGTLConnectorNode::NewDeviceEvent, node);
               }
-            }
-          collection->Delete();
+            else
+              {
+              for (int i = 0; i < nCol; i ++)
+                {
+                vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(collection->GetItemAsObject(i));
+                NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
+                node->DisableModifiedEventOn();
+                converter->IGTLToMRML(buffer, node);
+
+                // Save OpenIGTLink time stamp
+                // TODO: avoid calling New() every time.
+                igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
+                buffer->GetTimeStamp(ts);
+                nodeInfo->second = ts->GetSecond();
+                nodeInfo->nanosecond = ts->GetNanosecond();
+
+                node->Modified();  // in case converter doesn't call any Modifieds itself
+                node->DisableModifiedEventOff();
+                node->InvokePendingModifiedEvent();
+                updatedNode = node;
+                break;
+                // TODO: QueueNode supposes that there is only unique combination of type and node name,
+                // but it should be able to hold multiple nodes.
+                }
+              }
+            collection->Delete();
           }
         }
       }

@@ -122,6 +122,12 @@ void setTypeEnabled(qSlicerIGTLConnectorPropertyWidgetPrivate * d, bool enabled)
 }
 
 //------------------------------------------------------------------------------
+void setUseProtocolV2Enabled(qSlicerIGTLConnectorPropertyWidgetPrivate * d, bool enabled)
+{
+  d->UseProtocolV2CheckBox->setEnabled(enabled);
+}
+
+//------------------------------------------------------------------------------
 void setStateEnabled(qSlicerIGTLConnectorPropertyWidgetPrivate * d, bool enabled)
 {
   d->ConnectorStateLabel->setEnabled(enabled);
@@ -158,6 +164,7 @@ void qSlicerIGTLConnectorPropertyWidget::onMRMLNodeModified()
   d->ConnectorNotDefinedRadioButton->setChecked(type == vtkMRMLIGTLConnectorNode::TYPE_NOT_DEFINED);
   d->ConnectorServerRadioButton->setChecked(type == vtkMRMLIGTLConnectorNode::TYPE_SERVER);
   d->ConnectorClientRadioButton->setChecked(type == vtkMRMLIGTLConnectorNode::TYPE_CLIENT);
+  d->UseProtocolV2CheckBox->setChecked(d->IGTLConnectorNode->GetUseProtocolV2());
 
   setStateEnabled(d, type != vtkMRMLIGTLConnectorNode::TYPE_NOT_DEFINED);
 
@@ -166,6 +173,7 @@ void qSlicerIGTLConnectorPropertyWidget::onMRMLNodeModified()
     {
     setNameEnabled(d, true);
     setTypeEnabled(d, true);
+    setUseProtocolV2Enabled(d, true);
     setHostnameEnabled(d, type == vtkMRMLIGTLConnectorNode::TYPE_CLIENT);
     setPortEnabled(d, type != vtkMRMLIGTLConnectorNode::TYPE_NOT_DEFINED);
     }
@@ -173,6 +181,7 @@ void qSlicerIGTLConnectorPropertyWidget::onMRMLNodeModified()
     {
     setNameEnabled(d, false);
     setTypeEnabled(d, false);
+    setUseProtocolV2Enabled(d, false);
     setHostnameEnabled(d, false);
     setPortEnabled(d, false);
     }

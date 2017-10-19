@@ -20,6 +20,7 @@
 
 // OpenIGTLink includes
 #include <igtlMessageBase.h>
+#include <igtlMessageFactory.h>
 
 // MRML includes
 #include <vtkMRMLNode.h>
@@ -95,10 +96,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // This call enables the created node to query the message to determine any necessary properties
   virtual vtkMRMLNode* CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer message)
   {
-    /*
-    std::string mrmlNodeName = "";
-    this->incomingMessage->Copy(message);
-    if (MessageIsVersion3 && MetaInfoAvail)
+    if (MessageIsVersion2 && MetaInfoAvail)
       {
       return this->CreateNewNode(scene, name, mrmlNodeName.c_str());
       }
@@ -106,7 +104,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
       {
       return this->CreateNewNode(scene, name);
       }
-     */
     return NULL;
   };
 
@@ -117,8 +114,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // Description:
   // Functions to de-serialize (unpack) the OpenIGTLink message and store in the class instance.
   // The de-serialized message must be deleted in IGTLToMRML()
-  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer vtkNotUsed(buffer)) { return 1; };
-
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer);
+  
   // Description:
   // Functions to convert OpenIGTLink message to MRML node.
   // If mrmlNode is QueryNode, the function will generate query node. (event is not used.)
@@ -170,6 +167,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   bool MessageIsVersion2 = false;
   bool MetaInfoAvail = false;
   std::string mrmlNodeName = "";
+  
+  igtl::MessageFactory::Pointer IncommingMSGFactory;
   
   bool CheckIfMRMLSupported(const char* nodeTagName);
 };

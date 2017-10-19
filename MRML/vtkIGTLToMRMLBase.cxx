@@ -72,6 +72,7 @@ vtkIGTLToMRMLBase::vtkIGTLToMRMLBase()
 {
   this->CheckCRC = 1;
   this->Private = new vtkIGTLToMRMLBasePrivate;
+  this->IncommingMSGFactory = igtl::MessageFactory::New();
 }
 
 //---------------------------------------------------------------------------
@@ -130,6 +131,42 @@ int vtkIGTLToMRMLBase::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode
     }
   return 0;
 }
+
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLBase::UnpackIGTLMessage(igtl::MessageBase::Pointer buffer)
+{
+  igtl::MessageBase::Pointer message = this->IncommingMSGFactory->CreateReceiveMessage(buffer);
+  
+  message->Copy(buffer);
+  
+  // Deserialize the transform data
+  // If CheckCRC==0, CRC check is skipped.
+  int c = message->Unpack(this->CheckCRC);
+  
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
+    {
+    // TODO: error handling
+    return 0;
+    }
+  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
+    {
+    this->MessageIsVersion2 = true;
+    if(message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeName))
+      {
+      this->MetaInfoAvail = true;
+      }
+    else
+      {
+      this->MetaInfoAvail = false;
+      }
+    }
+  else if (message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+    {
+    this->MessageIsVersion2 = false;
+    }
+  return 1;
+}
+
 
 bool vtkIGTLToMRMLBase::CheckIfMRMLSupported(const char* nodeTagName)
 {

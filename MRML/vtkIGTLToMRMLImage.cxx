@@ -48,6 +48,7 @@ vtkStandardNewMacro(vtkIGTLToMRMLImage);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLImage::vtkIGTLToMRMLImage()
 {
+  this->InImageMessage = igtl::ImageMessage::New();
 }
 
 //---------------------------------------------------------------------------
@@ -119,6 +120,14 @@ vtkMRMLNode* vtkIGTLToMRMLImage::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
 {
   vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();
   vtkSmartPointer<vtkMRMLVolumeNode> volumeNode;
+  this->InImageMessage->Copy(incomingImageMessage);
+  int c = this->InImageMessage->Unpack(this->CheckCRC);
+  
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
+  {
+    // TODO: error handling
+    return NULL;
+  }
   int numberOfComponents=this->InImageMessage->GetNumComponents();
   //float fov = 256.0;
   image->SetDimensions(256, 256, 1);
@@ -245,44 +254,6 @@ int swapCopy64(igtlUint64 * dst, igtlUint64 * src, int n)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer buffer)
-{
-  if (this->InImageMessage.IsNull())
-    {
-    this->InImageMessage = igtl::ImageMessage::New();
-    }
-  this->InImageMessage->Copy(buffer);
-
-  // Deserialize the transform data
-  // If CheckCRC==0, CRC check is skipped.
-  int c = this->InImageMessage->Unpack(this->CheckCRC);
-
-  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
-    {
-    // TODO: error handling
-    return 0;
-    }
-  if(this->InImageMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
-    {
-    this->MessageIsVersion2 = true;
-    if(this->InImageMessage->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeName))
-      {
-      this->MetaInfoAvail = true;
-      }
-    else
-      {
-      this->MetaInfoAvail = false;
-      }
-    }
-  else if (this->InImageMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
-    {
-    this->MessageIsVersion2 = false;
-    }
-  return 1;
-}
-
-
-//---------------------------------------------------------------------------
 int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
 {
   vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(node);
@@ -301,9 +272,13 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   int   numComponents;    // number of scalar components
   int   endian;
   igtl::Matrix4x4 matrix; // Image origin and orientation matrix
-  if(this->InImageMessage.IsNull())
+  this->InImageMessage->Copy(buffer);
+  int c = this->InImageMessage->Unpack(this->CheckCRC);
+  
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
   {
-    this->UnpackIGTLMessage(buffer);
+    // TODO: error handling
+    return NULL;
   }
   scalarType = IGTLToVTKScalarType( this->InImageMessage->GetScalarType() );
   endian = this->InImageMessage->GetEndian();
