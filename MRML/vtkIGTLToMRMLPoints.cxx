@@ -63,7 +63,11 @@ vtkIntArray* vtkIGTLToMRMLPoints::GetNodeEvents()
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLPoints::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  
+  if (message.IsNull())
+    {
+    // TODO: error handling
+    return 0;
+    }
   this->InPointMsg->Copy(message);
   
   // Deserialize the transform data
@@ -75,16 +79,11 @@ int vtkIGTLToMRMLPoints::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
     return 0;
     }
   this->mrmlNodeTagName = "";
-  if (message.IsNull()) // if CRC check fails
+  if(this->InPointMsg->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
     {
-    // TODO: error handling
-    return 0;
+    this->InPointMsg->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
     }
-  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
-    {
-    message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
-    }
-  else if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+  else if(this->InPointMsg->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
     {
     this->mrmlNodeTagName = "MarkupsFiducial";
     }
@@ -170,7 +169,7 @@ int vtkIGTLToMRMLPoints::IGTLToMRML(vtkMRMLNode* node)
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLPoints::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLPoints::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (!mrmlNode)
     {
@@ -198,6 +197,9 @@ int vtkIGTLToMRMLPoints::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, 
         {
         this->PointMsg = igtl::PointMessage::New();
         }
+      unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+      this->PointMsg->SetHeaderVersion(headerVersion);
+      this->PointMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
       this->PointMsg->SetDeviceName(mrmlNode->GetName());
       this->PointMsg->ClearPointElement();
       
@@ -251,6 +253,8 @@ int vtkIGTLToMRMLPoints::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, 
           {
           this->GetPointMsg = igtl::GetPointMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->GetPointMsg->SetHeaderVersion(headerVersion);
         this->GetPointMsg->SetDeviceName(qnode->GetIGTLDeviceName());
         this->GetPointMsg->Pack();
         *size = this->GetPointMsg->GetPackSize();

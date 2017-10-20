@@ -68,6 +68,11 @@ vtkIntArray* vtkIGTLToMRMLImageMetaList::GetNodeEvents()
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLImageMetaList::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
+  if (message.IsNull())
+    {
+    // TODO: error handling
+    return 0;
+    }
   this->InImageMetaMessage->Copy(message);
   
   // Deserialize the transform data
@@ -77,20 +82,6 @@ int vtkIGTLToMRMLImageMetaList::UnpackIGTLMessage(igtl::MessageBase::Pointer mes
     {
     // TODO: error handling
     return 0;
-    }
-  this->mrmlNodeTagName = "";
-  if (message.IsNull()) // if CRC check fails
-    {
-    // TODO: error handling
-    return 0;
-    }
-  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
-    {
-    message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
-    }
-  else if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
-    {
-    this->mrmlNodeTagName = "ImageMetaList";
     }
   return 1;
 }
@@ -168,7 +159,7 @@ int vtkIGTLToMRMLImageMetaList::IGTLToMRML(vtkMRMLNode* node)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLImageMetaList::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLImageMetaList::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (!mrmlNode)
     {
@@ -187,6 +178,8 @@ int vtkIGTLToMRMLImageMetaList::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrm
           {
           this->GetImageMetaMessage = igtl::GetImageMetaMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->GetImageMetaMessage->SetHeaderVersion(headerVersion);
         this->GetImageMetaMessage->SetDeviceName(qnode->GetIGTLDeviceName());
         this->GetImageMetaMessage->Pack();
         *size = this->GetImageMetaMessage->GetPackSize();

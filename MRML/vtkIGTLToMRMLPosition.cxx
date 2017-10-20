@@ -88,6 +88,11 @@ vtkIntArray* vtkIGTLToMRMLPosition::GetNodeEvents()
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLPosition::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
+  if (message.IsNull())
+    {
+    // TODO: error handling
+    return 0;
+    }
   this->InPositionMsg->Copy(message);
   
   // Deserialize the transform data
@@ -146,7 +151,7 @@ int vtkIGTLToMRMLPosition::IGTLToMRML(vtkMRMLNode* node)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLPosition::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLPosition::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (mrmlNode && event == vtkMRMLTransformableNode::TransformModifiedEvent)
     {
@@ -160,7 +165,9 @@ int vtkIGTLToMRMLPosition::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode
       {
       this->OutPositionMsg = igtl::PositionMessage::New();
       }
-
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutPositionMsg->SetHeaderVersion(headerVersion);
+    this->OutPositionMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutPositionMsg->SetDeviceName(mrmlNode->GetName());
 
     igtl::Matrix4x4 igtlmatrix;

@@ -99,7 +99,7 @@ int vtkIGTLToMRMLStatus::IGTLToMRML(vtkMRMLNode* node)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLStatus::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLStatus::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (mrmlNode && event == vtkMRMLIGTLStatusNode::StatusModifiedEvent)
     {
@@ -116,7 +116,9 @@ int vtkIGTLToMRMLStatus::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, 
       {
       this->OutStatusMsg = igtl::StatusMessage::New();
       }
-
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutStatusMsg->SetHeaderVersion(headerVersion);
+    this->OutStatusMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutStatusMsg->SetDeviceName(statusNode->GetName());
     this->OutStatusMsg->SetCode(statusNode->GetCode());
     this->OutStatusMsg->SetSubCode(statusNode->GetSubCode());

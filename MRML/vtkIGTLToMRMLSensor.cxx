@@ -108,7 +108,7 @@ int vtkIGTLToMRMLSensor::IGTLToMRML(vtkMRMLNode* node)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLSensor::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLSensor::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (mrmlNode && event == vtkMRMLIGTLSensorNode::SensorModifiedEvent)
     {
@@ -124,7 +124,9 @@ int vtkIGTLToMRMLSensor::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, 
       {
       this->OutSensorMsg = igtl::SensorMessage::New();
       }
-
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutSensorMsg->SetHeaderVersion(headerVersion);
+    this->OutSensorMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutSensorMsg->SetDeviceName(sensorNode->GetName());
     this->OutSensorMsg->SetLength(sensorNode->GetArrayLength());
     this->OutSensorMsg->SetUnit(sensorNode->GetDataUnit());

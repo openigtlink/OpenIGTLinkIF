@@ -124,7 +124,7 @@ int vtkIGTLToMRMLTrackingData::IGTLToMRML(vtkMRMLNode* node)
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLTrackingData::MRMLToIGTL(unsigned long vtkNotUsed(event), vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLTrackingData::MRMLToIGTL(unsigned long vtkNotUsed(event), vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (!mrmlNode)
     {
@@ -148,6 +148,8 @@ int vtkIGTLToMRMLTrackingData::MRMLToIGTL(unsigned long vtkNotUsed(event), vtkMR
           {
           this->StartTrackingDataMessage = igtl::StartTrackingDataMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->StartTrackingDataMessage->SetHeaderVersion(headerVersion);
         this->StartTrackingDataMessage->SetDeviceName(qnode->GetIGTLDeviceName());
         this->StartTrackingDataMessage->SetResolution(50);
         this->StartTrackingDataMessage->SetCoordinateName("");
@@ -162,6 +164,8 @@ int vtkIGTLToMRMLTrackingData::MRMLToIGTL(unsigned long vtkNotUsed(event), vtkMR
           {
           this->StopTrackingDataMessage = igtl::StopTrackingDataMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->StopTrackingDataMessage->SetHeaderVersion(headerVersion);
         this->StopTrackingDataMessage->SetDeviceName(qnode->GetIGTLDeviceName());
         this->StopTrackingDataMessage->Pack();
         *size = this->StopTrackingDataMessage->GetPackSize();

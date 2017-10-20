@@ -20,7 +20,6 @@
 
 // OpenIGTLink includes
 #include <igtlMessageBase.h>
-#include <igtlMessageFactory.h>
 
 // MRML includes
 #include <vtkMRMLNode.h>
@@ -87,20 +86,14 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name)
   {
     vtkMRMLNode* node = this->CreateMRMLNodeBaseOnTagName(scene);
-    node->SetName(name);
-    node->SetDescription("Received by OpenIGTLink");
-    return node;
-  }
-  // This call enables the created node to query the message to determine any necessary properties
-  virtual vtkMRMLNode* CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer message)
-  {
-    vtkMRMLNode* node = NULL;
-    if(this->UnpackIGTLMessage(message))
+    if (node)
       {
-      node= this->CreateNewNode(scene, name);
+      node->SetName(name);
+      node->SetDescription("Received by OpenIGTLink");
+      scene->AddNode(node);
       }
     return node;
-  };
+  }
 
   // for TYPE_MULTI_IGTL_NAMES
   int                  GetNumberOfIGTLNames()   { return this->IGTLNames.size(); };
@@ -109,7 +102,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLBase : public vtk
   // Description:
   // Functions to de-serialize (unpack) the OpenIGTLink message and store in the class instance.
   // The de-serialized message must be deleted in IGTLToMRML()
-  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer){return 0;};
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer vtkNotUsed(buffer)){return 0;};
   
   // Check meta information for creating mrmlnode
   //virtual int          CheckMetaInfo(igtl::MessageBase::Pointer message);

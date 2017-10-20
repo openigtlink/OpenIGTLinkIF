@@ -100,6 +100,11 @@ vtkIntArray* vtkIGTLToMRMLLinearTransform::GetNodeEvents()
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLLinearTransform::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
+  if (message.IsNull())
+    {
+    // TODO: error handling
+    return 0;
+    }
   this->InTransformMsg->Copy(message);
   
   // Deserialize the transform data
@@ -109,20 +114,6 @@ int vtkIGTLToMRMLLinearTransform::UnpackIGTLMessage(igtl::MessageBase::Pointer m
     {
     // TODO: error handling
     return 0;
-    }
-  this->mrmlNodeTagName = "";
-  if (message.IsNull()) // if CRC check fails
-    {
-    // TODO: error handling
-    return 0;
-    }
-  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
-    {
-    message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
-    }
-  else if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
-    {
-    this->mrmlNodeTagName = "LinearTransform";
     }
   return 1;
 }
@@ -194,7 +185,7 @@ int vtkIGTLToMRMLLinearTransform::IGTLToMRML(vtkMRMLNode* node)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (mrmlNode && event == vtkMRMLTransformableNode::TransformModifiedEvent)
     {
@@ -208,7 +199,9 @@ int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* m
       {
       this->OutTransformMsg = igtl::TransformMessage::New();
       }
-
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutTransformMsg->SetHeaderVersion(headerVersion);
+    this->OutTransformMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutTransformMsg->SetDeviceName(mrmlNode->GetName());
 
     igtl::Matrix4x4 igtlmatrix;
@@ -231,6 +224,7 @@ int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* m
     igtlmatrix[3][3]  = matrix->Element[3][3];
 
     this->OutTransformMsg->SetMatrix(igtlmatrix);
+    this->OutTransformMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutTransformMsg->Pack();
 
     *size = this->OutTransformMsg->GetPackSize();

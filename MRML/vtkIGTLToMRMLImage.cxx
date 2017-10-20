@@ -119,6 +119,11 @@ void vtkIGTLToMRMLImage::SetDefaultDisplayNode(vtkMRMLVolumeNode *volumeNode, in
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
+  if (message.IsNull())
+    {
+    // TODO: error handling
+    return 0;
+    }
   this->InImageMessage->Copy(message);
   
   // Deserialize the transform data
@@ -130,16 +135,11 @@ int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
     return 0;
     }
   this->mrmlNodeTagName = "";
-  if (message.IsNull()) // if CRC check fails
+  if(this->InImageMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
     {
-    // TODO: error handling
-    return 0;
+    this->InImageMessage->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
     }
-  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
-    {
-    message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
-    }
-  else if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+  else if(this->InImageMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
     {
     int numberOfComponents=this->InImageMessage->GetNumComponents();
     if (numberOfComponents == 1)
@@ -609,6 +609,7 @@ int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
       }
     unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
     this->OutImageMessage->SetHeaderVersion(headerVersion);
+    this->OutImageMessage->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutImageMessage->SetDimensions(isize);
     this->OutImageMessage->SetSpacing((float)spacing[0], (float)spacing[1], (float)spacing[2]);
     this->OutImageMessage->SetScalarType(scalarType);
@@ -617,7 +618,7 @@ int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
     this->OutImageMessage->SetSubVolume(isize, svoffset);
     this->OutImageMessage->SetNumComponents(ncomp);
     this->OutImageMessage->AllocateScalars();
-    this->OutImageMessage->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
+    
     memcpy(this->OutImageMessage->GetScalarPointer(),
            imageData->GetScalarPointer(),
            this->OutImageMessage->GetImageSize());
@@ -691,6 +692,8 @@ int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
           {
           this->GetImageMessage = igtl::GetImageMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->GetImageMessage->SetHeaderVersion(headerVersion);
         this->GetImageMessage->SetDeviceName(qnode->GetIGTLDeviceName());
         this->GetImageMessage->Pack();
         *size = this->GetImageMessage->GetPackSize();

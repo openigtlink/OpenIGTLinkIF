@@ -79,6 +79,7 @@ vtkMRMLNode* vtkIGTLToMRMLPolyData::CreateNewNode(vtkMRMLScene* scene, const cha
   if (node)
     {
     vtkSmartPointer<vtkMRMLModelNode> modelNode;
+    modelNode = vtkMRMLModelNode::SafeDownCast(node);
     modelNode->SetName(name);
 
     scene->SaveStateForUndo();
@@ -86,27 +87,33 @@ vtkMRMLNode* vtkIGTLToMRMLPolyData::CreateNewNode(vtkMRMLScene* scene, const cha
     vtkDebugMacro("Setting scene info");
     modelNode->SetScene(scene);
     modelNode->SetDescription("Received by OpenIGTLink");
+    if(strcmp(node->GetNodeTagName(), "Model")==0)
+      {      
+      double color[3];
+      color[0] = 0.5;
+      color[1] = 0.5;
+      color[2] = 1.0;
+      // Display Node
+      vtkSmartPointer< vtkMRMLModelDisplayNode > displayNode = vtkSmartPointer< vtkMRMLModelDisplayNode >::New();
+      displayNode->SetColor(color);
+      displayNode->SetOpacity(1.0);
 
-    modelNode = vtkMRMLModelNode::SafeDownCast(node);
-    double color[3];
-    color[0] = 0.5;
-    color[1] = 0.5;
-    color[2] = 1.0;
-    // Display Node
-    vtkSmartPointer< vtkMRMLModelDisplayNode > displayNode = vtkSmartPointer< vtkMRMLModelDisplayNode >::New();
-    displayNode->SetColor(color);
-    displayNode->SetOpacity(1.0);
+      displayNode->SliceIntersectionVisibilityOn();  
+      displayNode->VisibilityOn();
 
-    displayNode->SliceIntersectionVisibilityOn();  
-    displayNode->VisibilityOn();
+      scene->SaveStateForUndo();
+      scene->AddNode(modelNode);
+      scene->AddNode(displayNode);
 
-    scene->SaveStateForUndo();
+      displayNode->SetScene(scene);
+      modelNode->SetAndObserveDisplayNodeID(displayNode->GetID());
+      modelNode->SetHideFromEditors(0);
+      }
+    else
+      {
+      modelNode->CreateDefaultDisplayNodes();
+      }
     scene->AddNode(modelNode);
-    scene->AddNode(displayNode);
-
-    displayNode->SetScene(scene);
-    modelNode->SetAndObserveDisplayNodeID(displayNode->GetID());
-    modelNode->SetHideFromEditors(0);
     return modelNode;
     }
   
@@ -128,6 +135,11 @@ vtkIntArray* vtkIGTLToMRMLPolyData::GetNodeEvents()
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLPolyData::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
+  if (message.IsNull())
+    {
+    // TODO: error handling
+    return 0;
+    }
   this->InPolyDataMessage->Copy(message);
   
   // Deserialize the transform data
@@ -139,16 +151,11 @@ int vtkIGTLToMRMLPolyData::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
     return 0;
     }
   this->mrmlNodeTagName = "";
-  if (message.IsNull()) // if CRC check fails
+  if(this->InPolyDataMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
     {
-    // TODO: error handling
-    return 0;
+    this->InPolyDataMessage->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
     }
-  if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
-    {
-    message->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
-    }
-  else if(message->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+  else if(this->InPolyDataMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
     {
     this->mrmlNodeTagName = "Model";
     }
@@ -369,7 +376,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(vtkMRMLNode* node)
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (!mrmlNode)
     {
@@ -377,7 +384,7 @@ int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode
     }
 
   // If mrmlNode is PolyData node
-  if (event == vtkMRMLModelNode::PolyDataModifiedEvent && strcmp(mrmlNode->GetNodeTagName(), "Model") == 0)
+  if (event == vtkMRMLModelNode::PolyDataModifiedEvent && this->CheckIfMRMLSupported(mrmlNode->GetNodeTagName()))
     {
     vtkMRMLModelNode* modelNode =
       vtkMRMLModelNode::SafeDownCast(mrmlNode);
@@ -405,7 +412,9 @@ int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode
       {
       this->OutPolyDataMessage->Clear();
       }
-    
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutPolyDataMessage->SetHeaderVersion(headerVersion);
+    this->OutPolyDataMessage->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     // Set message name -- use the same name as the MRML node 
     this->OutPolyDataMessage->SetDeviceName(modelNode->GetName());
 
@@ -522,6 +531,8 @@ int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode
           {
           this->GetPolyDataMessage = igtl::GetPolyDataMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->GetPolyDataMessage->SetHeaderVersion(headerVersion);
         this->GetPolyDataMessage->SetDeviceName(qnode->GetIGTLDeviceName());
         this->GetPolyDataMessage->Pack();
         *size = this->GetPolyDataMessage->GetPackSize();

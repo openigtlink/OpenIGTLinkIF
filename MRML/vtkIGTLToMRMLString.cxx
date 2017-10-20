@@ -102,7 +102,7 @@ int vtkIGTLToMRMLString::IGTLToMRML(vtkMRMLNode* node )
 
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLString
-::MRMLToIGTL( unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg )
+::MRMLToIGTL( unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if ( mrmlNode == NULL )
     {
@@ -138,6 +138,9 @@ int vtkIGTLToMRMLString
       {
       this->StringMsg = igtl::StringMessage::New();
       }
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->StringMsg->SetHeaderVersion(headerVersion);
+    this->StringMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->StringMsg->SetDeviceName( deviceName );
     this->StringMsg->SetString( text );
     this->StringMsg->SetEncoding( encoding );

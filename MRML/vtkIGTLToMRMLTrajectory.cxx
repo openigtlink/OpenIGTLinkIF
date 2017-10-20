@@ -123,7 +123,7 @@ int vtkIGTLToMRMLTrajectory::IGTLToMRML(vtkMRMLNode* node)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLTrajectory::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLTrajectory::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
 
   if (mrmlNode && (event == vtkMRMLHierarchyNode::ChildNodeAddedEvent ||
@@ -141,7 +141,9 @@ int vtkIGTLToMRMLTrajectory::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNo
       {
       this->OutTrajectoryMsg = igtl::TrajectoryMessage::New();
       }
-
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutTrajectoryMsg->SetHeaderVersion(headerVersion);
+    this->OutTrajectoryMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutTrajectoryMsg->SetDeviceName(hierarchyNode->GetName());
 
     // Add all trajectory elements from hierarchy node

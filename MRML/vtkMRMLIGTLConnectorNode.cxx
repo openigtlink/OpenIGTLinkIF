@@ -1100,22 +1100,25 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
             if (nCol == 0)
             {
               // Call the advanced creation call first to see if the requested converter needs the message itself
-              vtkMRMLNode* node = converter->CreateNewNodeWithMessage(this->GetScene(), buffer->GetDeviceName(), buffer);
-              NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
-              node->DisableModifiedEventOn();
-              converter->IGTLToMRML(node);
+              vtkMRMLNode* node = converter->CreateNewNode(this->GetScene(), buffer->GetDeviceName());
+              if (node)
+                {
+                NodeInfoType* nodeInfo = RegisterIncomingMRMLNode(node);
+                node->DisableModifiedEventOn();
+                converter->IGTLToMRML(node);
 
-              // Save OpenIGTLink time stamp
-              igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
-              buffer->GetTimeStamp(ts);
-              nodeInfo->second = ts->GetSecond();
-              nodeInfo->nanosecond = ts->GetNanosecond();
+                // Save OpenIGTLink time stamp
+                igtl::TimeStamp::Pointer ts = igtl::TimeStamp::New();
+                buffer->GetTimeStamp(ts);
+                nodeInfo->second = ts->GetSecond();
+                nodeInfo->nanosecond = ts->GetNanosecond();
 
-              node->Modified();  // in case converter doesn't call any Modifieds itself
-              node->DisableModifiedEventOff();
-              node->InvokePendingModifiedEvent();
-              updatedNode = node;
-              this->InvokeEvent(vtkMRMLIGTLConnectorNode::NewDeviceEvent, node);
+                node->Modified();  // in case converter doesn't call any Modifieds itself
+                node->DisableModifiedEventOff();
+                node->InvokePendingModifiedEvent();
+                updatedNode = node;
+                this->InvokeEvent(vtkMRMLIGTLConnectorNode::NewDeviceEvent, node);
+                }
               }
             else
               {
