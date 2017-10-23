@@ -24,6 +24,8 @@ Version:   $Revision: 1.2 $
 #include <igtlMessageBase.h>
 #include <igtlMessageHeader.h>
 
+#include "vtkSlicerOpenIGTLinkIFLogic.h"
+
 // MRML includes
 #include <vtkMRMLScene.h>
 
@@ -90,13 +92,9 @@ vtkMRMLIGTLConnectorNode::vtkMRMLIGTLConnectorNode()
   this->IncomingDeviceIDSet.clear();
   this->OutgoingDeviceIDSet.clear();
   this->UnspecifiedDeviceIDSet.clear();
-
-  this->MessageConverterList.clear();
-  this->IGTLNameToConverterMap.clear();
-  this->MRMLIDToConverterMap.clear();
-
-  //this->OutgoingMRMLNodeList.clear();
-  //this->IncomingMRMLNodeInfoList.clear();
+  
+  this->converterFactory = vtkIGTLToMRMLConverterFactory::New();
+  
   this->IncomingMRMLNodeInfoMap.clear();
 
   this->CheckCRC = 1;
@@ -118,7 +116,8 @@ vtkMRMLIGTLConnectorNode::vtkMRMLIGTLConnectorNode()
   this->SetOutgoingNodeReferenceMRMLAttributeName("outgoingNodeRef");
   this->AddNodeReferenceRole(this->GetOutgoingNodeReferenceRole(),
                              this->GetOutgoingNodeReferenceMRMLAttributeName());
-
+                             
+  this->OpenIGTLinkIFLogic = NULL;
 }
 
 //----------------------------------------------------------------------------
@@ -353,7 +352,29 @@ void vtkMRMLIGTLConnectorNode::ProcessMRMLEvents( vtkObject *caller, unsigned lo
       }
     }
 }
+//----------------------------------------------------------------------------
+vtkIGTLToMRMLBase* vtkMRMLIGTLConnectorNode::GetConverterByMRMLTag(const char* tag)
+{
+  return this->converterFactory->GetConverterByMRMLTag(tag);
+}
 
+//----------------------------------------------------------------------------
+vtkIGTLToMRMLBase* vtkMRMLIGTLConnectorNode::GetConverterByIGTLDeviceType(const char* type)
+{
+  return this->converterFactory->GetConverterByIGTLDeviceType(type);
+}
+
+//----------------------------------------------------------------------------
+int vtkMRMLIGTLConnectorNode::RegisterMessageConverter(vtkIGTLToMRMLBase* converter)
+{
+  return this->converterFactory->RegisterMessageConverter(converter);
+}
+
+//----------------------------------------------------------------------------
+int vtkMRMLIGTLConnectorNode::UnregisterMessageConverter(vtkIGTLToMRMLBase* converter)
+{
+  return this->converterFactory->UnregisterMessageConverter(converter);
+}
 
 //----------------------------------------------------------------------------
 void vtkMRMLIGTLConnectorNode::OnNodeReferenceAdded(vtkMRMLNodeReference *reference)
@@ -389,18 +410,18 @@ void vtkMRMLIGTLConnectorNode::OnNodeReferenceAdded(vtkMRMLNodeReference *refere
     if (devType == NULL)
       {
       const char* tag = node->GetNodeTagName();
-      converter = GetConverterByMRMLTag(tag);
+      converter = this->converterFactory->GetConverterByMRMLTag(tag);
       }
     else
       {
-      converter = GetConverterByIGTLDeviceType(devType);
+      converter = this->converterFactory->GetConverterByIGTLDeviceType(devType);
       }
     if (!converter)
       {
       // TODO: Remove the reference ID?
       return;
       }
-    this->MRMLIDToConverterMap[node->GetID()] = converter;
+    this->converterFactory->SetMRMLIDToConverterMap(node->GetID(), converter);
 
     // Need to update the events here because observed events are not saved in the scene
     // for each reference and therefore only the role-default event observers are added.
@@ -448,11 +469,7 @@ void vtkMRMLIGTLConnectorNode::OnNodeReferenceRemoved(vtkMRMLNodeReference *refe
   else
     {
     // Search converter from MRMLIDToConverterMap
-    MessageConverterMapType::iterator citer = this->MRMLIDToConverterMap.find(nodeID);
-    if (citer != this->MRMLIDToConverterMap.end())
-      {
-      this->MRMLIDToConverterMap.erase(citer);
-      }
+    this->converterFactory->RemoveMRMLIDToConverterMap(nodeID);
     }
 }
 
@@ -577,13 +594,7 @@ void vtkMRMLIGTLConnectorNode::SetCheckCRC(int c)
     }
 
   // Set CheckCRC flag in each converter
-  MessageConverterListType::iterator iter;
-  for (iter = this->MessageConverterList.begin();
-       iter != this->MessageConverterList.end();
-       iter ++)
-    {
-    (*iter)->SetCheckCRC(this->CheckCRC);
-    }
+  this->converterFactory->SetCheckCRC(c);
 
 }
 
@@ -1019,9 +1030,8 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
 
     igtl::MessageBase::Pointer buffer = circBuffer->GetPullBuffer();
 
-    MessageConverterMapType::iterator conIter =
-      this->IGTLNameToConverterMap.find(buffer->GetDeviceType());
-    if (conIter == this->IGTLNameToConverterMap.end()) // couldn't find from the map
+    vtkIGTLToMRMLBase* converter = this->converterFactory->GetIGTLNameToConverterMap(buffer->GetDeviceType());
+    if (converter == NULL) // couldn't find from the map
       {
       continue;
       }
@@ -1031,7 +1041,7 @@ void vtkMRMLIGTLConnectorNode::ImportDataFromCircularBuffer()
       buffer->SetDeviceName("OpenIGTLink");
       }
 
-    vtkIGTLToMRMLBase* converter = conIter->second;
+    
 
     vtkMRMLScene* scene = this->GetScene();
 
@@ -1294,106 +1304,27 @@ void vtkMRMLIGTLConnectorNode::PushOutgoingMessages()
 }
 
 
+
 //---------------------------------------------------------------------------
-int vtkMRMLIGTLConnectorNode::RegisterMessageConverter(vtkIGTLToMRMLBase* converter)
+void vtkMRMLIGTLConnectorNode::SetOpenIGTLinkIFLogic(vtkSlicerOpenIGTLinkIFLogic* logic)
 {
-  if (converter == NULL)
+  this->OpenIGTLinkIFLogic = logic;
+  this->converterFactory->SetOpenIGTLinkIFLogic(logic);
+}
+
+
+//---------------------------------------------------------------------------
+vtkSlicerOpenIGTLinkIFLogic* vtkMRMLIGTLConnectorNode::GetOpenIGTLinkIFLogic()
+{
+  if (this->OpenIGTLinkIFLogic)
     {
-      return 0;
-    }
-
-  // Check if the same converter has already been registered.
-  MessageConverterListType::iterator iter;
-  for (iter = this->MessageConverterList.begin();
-       iter != this->MessageConverterList.end();
-       iter ++)
-    {
-    if ((converter->GetIGTLName() && strcmp(converter->GetIGTLName(), (*iter)->GetIGTLName()) == 0) &&
-        (converter->GetMRMLName() && strcmp(converter->GetMRMLName(), (*iter)->GetMRMLName()) == 0))
-      {
-      return 0;
-      }
-    }
-
-  // Register the converter
-  if (converter->GetIGTLName() && converter->GetMRMLName())
-    {
-    // check the converter type (single IGTL name or multiple IGTL names?)
-    if (converter->GetConverterType() == vtkIGTLToMRMLBase::TYPE_NORMAL)
-      {
-      const char* name = converter->GetIGTLName();
-
-      // Check if the name already exists.
-      MessageConverterMapType::iterator citer;
-      citer = this->IGTLNameToConverterMap.find(name);
-      if (citer != this->IGTLNameToConverterMap.end()) // exists
-        {
-        std::cerr << "The converter with the same IGTL name has already been registered." << std::endl;
-        return 0;
-        }
-      else
-        {
-        // Add converter to the map
-        this->IGTLNameToConverterMap[name] = converter;
-        }
-      }
-
-    else // vtkIGTLToMRMLBase::TYPE_MULTI_IGTL_NAMES
-      {
-      int numNames = converter->GetNumberOfIGTLNames();
-
-      // Check if one of the names already exists.
-      for (int i = 0; i < numNames; i ++)
-        {
-        const char* name = converter->GetIGTLName(i);
-        MessageConverterMapType::iterator citer;
-        citer = this->IGTLNameToConverterMap.find(name);
-        if (citer != this->IGTLNameToConverterMap.end()) // exists
-          {
-          std::cerr << "The converter with the same IGTL name has already been registered." << std::endl;
-          return 0;
-          }
-        }
-
-      for (int i = 0; i < numNames; i ++)
-        {
-        // Add converter to the map
-        const char* name = converter->GetIGTLName(i);
-        this->IGTLNameToConverterMap[name] = converter;
-        }
-
-      }
-
-    // Set CRC check flag
-    converter->SetCheckCRC(this->CheckCRC);
-
-    // Add the converter to the list
-    this->MessageConverterList.push_back(converter);
-
-    return 1;
+    return this->OpenIGTLinkIFLogic;
     }
   else
     {
-    return 0;
+    return NULL;
     }
 }
-
-
-//---------------------------------------------------------------------------
-void vtkMRMLIGTLConnectorNode::UnregisterMessageConverter(vtkIGTLToMRMLBase* converter)
-{
-  if (!converter)
-    {
-    return;
-    }
-  MessageConverterListType::iterator iter = this->MessageConverterList.begin();
-  while(iter != this->MessageConverterList.end())
-    {
-    this->MessageConverterList.erase(iter);
-    iter = this->MessageConverterList.begin();
-    }
-}
-
 
 //---------------------------------------------------------------------------
 int vtkMRMLIGTLConnectorNode::RegisterOutgoingMRMLNode(vtkMRMLNode* node, const char* devType)
@@ -1543,15 +1474,7 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOutgoingMRMLNode(unsigned int i)
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLBase* vtkMRMLIGTLConnectorNode::GetConverterByNodeID(const char* id)
 {
-
-  MessageConverterMapType::iterator iter;
-  iter = this->MRMLIDToConverterMap.find(id);
-  if (iter == this->MRMLIDToConverterMap.end())
-    {
-    return NULL;
-    }
-  return iter->second;
-
+  return this->converterFactory->GetConverterByNodeID(id);
 }
 
 
@@ -1582,76 +1505,6 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetIncomingMRMLNode(unsigned int i)
 
 
 //---------------------------------------------------------------------------
-vtkIGTLToMRMLBase* vtkMRMLIGTLConnectorNode::GetConverterByMRMLTag(const char* tag)
-{
-  if (tag == NULL)
-    {
-    vtkErrorMacro("vtkMRMLIGTLConnectorNode::GetConverterByMRMLTag failed: invalid tag");
-    return NULL;
-    }
-
-  MessageConverterListType::iterator iter;
-  for (iter = this->MessageConverterList.begin();
-       iter != this->MessageConverterList.end();
-       iter ++)
-    {
-    if ((*iter) == NULL)
-      {
-      continue;
-      }
-    std::vector<std::string> supportedMRMLNodeNames = (*iter)->GetAllMRMLNames();
-    for (unsigned int i = 0; i<supportedMRMLNodeNames.size(); i++)
-      {
-      if (supportedMRMLNodeNames[i].compare(tag) == 0)
-        {
-        return *iter;
-        }
-      }
-    }
-
-  // if no converter is found.
-  return NULL;
-
-}
-
-
-//---------------------------------------------------------------------------
-vtkIGTLToMRMLBase* vtkMRMLIGTLConnectorNode::GetConverterByIGTLDeviceType(const char* type)
-{
-  MessageConverterListType::iterator iter;
-
-  for (iter = this->MessageConverterList.begin();
-       iter != this->MessageConverterList.end();
-       iter ++)
-    {
-    vtkIGTLToMRMLBase* converter = *iter;
-    if (converter->GetConverterType() == vtkIGTLToMRMLBase::TYPE_NORMAL)
-      {
-      if (strcmp(converter->GetIGTLName(), type) == 0)
-        {
-        return converter;
-        }
-      }
-    else // The converter has multiple IGTL device names
-      {
-      int n = converter->GetNumberOfIGTLNames();
-      for (int i = 0; i < n; i ++)
-        {
-        if (strcmp(converter->GetIGTLName(i), type) == 0)
-          {
-          return converter;
-          }
-        }
-      }
-    }
-
-  // if no converter is found.
-  return NULL;
-
-}
-
-
-//---------------------------------------------------------------------------
 int vtkMRMLIGTLConnectorNode::PushNode(vtkMRMLNode* node, int event)
 {
   if (!node)
@@ -1662,15 +1515,13 @@ int vtkMRMLIGTLConnectorNode::PushNode(vtkMRMLNode* node, int event)
   int size;
   void* igtlMsg;
 
-  MessageConverterMapType::iterator iter = this->MRMLIDToConverterMap.find(node->GetID());
-  if (iter == this->MRMLIDToConverterMap.end())
+  vtkIGTLToMRMLBase* converter = this->GetConverterByNodeID(node->GetID());
+  
+  if (converter == NULL)
     {
-    vtkErrorMacro("Node is not found in MRMLIDToConverterMap: "<<node->GetID());
     return 0;
     }
-
-  vtkIGTLToMRMLBase* converter = iter->second;
-
+  
   int e = event;
 
   if (e < 0)
@@ -1717,7 +1568,7 @@ void vtkMRMLIGTLConnectorNode::PushQuery(vtkMRMLIGTLQueryNode* node)
 
   int size=0;
   void* igtlMsg=NULL;
-  converter->MRMLToIGTL(0, node, &size, &igtlMsg);
+  converter->MRMLToIGTL(0, node, &size, &igtlMsg, this->UseProtocolV2);
   if (size<=0)
     {
     vtkErrorMacro("vtkMRMLIGTLConnectorNode::PushQuery failed: MRMLToIGTL provided an invalid message");

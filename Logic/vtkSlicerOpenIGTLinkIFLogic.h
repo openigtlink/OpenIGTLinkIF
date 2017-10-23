@@ -18,19 +18,7 @@
 #define __vtkSlicerOpenIGTLinkIFLogic_h
 
 // OpenIGTLinkIF MRML includes
-#include "vtkIGTLToMRMLBase.h"
-#include "vtkIGTLToMRMLLinearTransform.h"
-#include "vtkIGTLToMRMLImage.h"
-#include "vtkIGTLToMRMLPosition.h"
-#include "vtkIGTLToMRMLImageMetaList.h"
-#include "vtkIGTLToMRMLLabelMetaList.h"
-#include "vtkIGTLToMRMLPoints.h"
-#include "vtkIGTLToMRMLPolyData.h"
-#include "vtkIGTLToMRMLTrackingData.h"
-#include "vtkIGTLToMRMLStatus.h"
-#include "vtkIGTLToMRMLSensor.h"
-#include "vtkIGTLToMRMLString.h"
-#include "vtkIGTLToMRMLTrajectory.h"
+#include "vtkIGTLToMRMLConverterFactory.h"
 
 #include "vtkSlicerOpenIGTLinkIFModuleLogicExport.h"
 
@@ -53,6 +41,7 @@
 #include <vector>
 
 class vtkMRMLIGTLConnectorNode;
+class vtkIGTLToMRMLConverterFactory;
 
 /// \ingroup Slicer_QtModules_OpenIGTLinkIF
 class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic : public vtkSlicerModuleLogic
@@ -72,7 +61,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   } IGTLMrmlNodeInfoType;
 
   typedef std::vector<IGTLMrmlNodeInfoType>         IGTLMrmlNodeListType;
-  typedef std::vector<vtkIGTLToMRMLBase*>           MessageConverterListType;
 
   // Work phase keywords used in NaviTrack (defined in BRPTPRInterface.h)
 
@@ -114,7 +102,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   // Device Name management
   int  SetRestrictDeviceName(int f);
 
-  int  RegisterMessageConverter(vtkIGTLToMRMLBase* converter);
+  int  RegisterMessageConverter(vtkMRMLIGTLConnectorNode * connectorNode);
   int  UnregisterMessageConverter(vtkIGTLToMRMLBase* converter);
 
   unsigned int       GetNumberOfConverters();
@@ -149,8 +137,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   void AddMRMLConnectorNodeObserver(vtkMRMLIGTLConnectorNode * connectorNode);
   void RemoveMRMLConnectorNodeObserver(vtkMRMLIGTLConnectorNode * connectorNode);
 
-  void RegisterMessageConverters(vtkMRMLIGTLConnectorNode * connectorNode);
-
   void UpdateAll();
   void UpdateSliceDisplay();
   vtkCallbackCommand *DataCallbackCommand;
@@ -163,27 +149,13 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_LOGIC_EXPORT vtkSlicerOpenIGTLinkIFLogic :
   // Connector Management
   //----------------------------------------------------------------
 
-  //ConnectorMapType              ConnectorMap;
-  MessageConverterListType      MessageConverterList;
-
   //int LastConnectorID;
   int RestrictDeviceName;
 
   //----------------------------------------------------------------
   // IGTL-MRML converters
   //----------------------------------------------------------------
-  vtkIGTLToMRMLLinearTransform* LinearTransformConverter;
-  vtkIGTLToMRMLImage*           ImageConverter;
-  vtkIGTLToMRMLPosition*        PositionConverter;
-  vtkIGTLToMRMLStatus*          StatusConverter;
-  vtkIGTLToMRMLImageMetaList*   ImageMetaListConverter;
-  vtkIGTLToMRMLLabelMetaList*   LabelMetaListConverter;
-  vtkIGTLToMRMLPoints*          PointConverter;
-  vtkIGTLToMRMLPolyData*        PolyDataConverter;
-  vtkIGTLToMRMLSensor*          SensorConverter;
-  vtkIGTLToMRMLString*          StringConverter;
-  vtkIGTLToMRMLTrackingData*    TrackingDataConverter;
-  vtkIGTLToMRMLTrajectory*      TrajectoryConverter;
+  vtkIGTLToMRMLConverterFactory* converterFactory;
 
 private:
 

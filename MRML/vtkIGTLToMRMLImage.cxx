@@ -124,7 +124,7 @@ int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
     // TODO: error handling
     return 0;
     }
-  this->InImageMessage->Copy(message);
+  this->InImageMessage->Copy(message); // !! TODO: copy makes performance issue.
   
   // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.

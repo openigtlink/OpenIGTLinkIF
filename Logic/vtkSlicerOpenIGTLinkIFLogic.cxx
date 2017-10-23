@@ -52,109 +52,12 @@ vtkSlicerOpenIGTLinkIFLogic::vtkSlicerOpenIGTLinkIFLogic()
 
   this->Initialized   = 0;
   this->RestrictDeviceName = 0;
-
-  this->MessageConverterList.clear();
-
-  // register default data types
-  this->LinearTransformConverter = vtkIGTLToMRMLLinearTransform::New();
-  this->ImageConverter           = vtkIGTLToMRMLImage::New();
-  this->PositionConverter        = vtkIGTLToMRMLPosition::New();
-  this->StatusConverter          = vtkIGTLToMRMLStatus::New();
-
-  this->ImageMetaListConverter   = vtkIGTLToMRMLImageMetaList::New();
-  this->LabelMetaListConverter   = vtkIGTLToMRMLLabelMetaList::New();
-  this->PointConverter           = vtkIGTLToMRMLPoints::New();
-  this->PolyDataConverter        = vtkIGTLToMRMLPolyData::New();
-  this->SensorConverter          = vtkIGTLToMRMLSensor::New();
-  this->StringConverter          = vtkIGTLToMRMLString::New();
-  this->TrackingDataConverter    = vtkIGTLToMRMLTrackingData::New();
-  this->TrajectoryConverter      = vtkIGTLToMRMLTrajectory::New();
-  
-  
-  RegisterMessageConverter(this->LinearTransformConverter);
-  RegisterMessageConverter(this->ImageConverter);
-  RegisterMessageConverter(this->PositionConverter);
-  RegisterMessageConverter(this->StatusConverter);
-
-  RegisterMessageConverter(this->ImageMetaListConverter);
-  RegisterMessageConverter(this->LabelMetaListConverter);
-  RegisterMessageConverter(this->PointConverter);
-  RegisterMessageConverter(this->PolyDataConverter);
-  RegisterMessageConverter(this->SensorConverter);
-  RegisterMessageConverter(this->StringConverter);
-  RegisterMessageConverter(this->TrackingDataConverter);
-  RegisterMessageConverter(this->TrajectoryConverter);
-
-  //this->LocatorTransformNode = NULL;
+  this->converterFactory = vtkIGTLToMRMLConverterFactory::New();
 }
 
 //---------------------------------------------------------------------------
 vtkSlicerOpenIGTLinkIFLogic::~vtkSlicerOpenIGTLinkIFLogic()
 {
-  if (this->LinearTransformConverter)
-    {
-    UnregisterMessageConverter(this->LinearTransformConverter);
-    this->LinearTransformConverter->Delete();
-    }
-
-  if (this->ImageConverter)
-    {
-    UnregisterMessageConverter(this->ImageConverter);
-    this->ImageConverter->Delete();
-    }
-
-  if (this->PositionConverter)
-    {
-    UnregisterMessageConverter(this->PositionConverter);
-    this->PositionConverter->Delete();
-    }
-
-  if (this->ImageMetaListConverter)
-    {
-    UnregisterMessageConverter(this->ImageMetaListConverter);
-    this->ImageMetaListConverter->Delete();
-    }
-  if (this->LabelMetaListConverter)
-    {
-    UnregisterMessageConverter(this->LabelMetaListConverter);
-    this->LabelMetaListConverter->Delete();
-    }
-  if (this->PointConverter)
-    {
-    UnregisterMessageConverter(this->PointConverter);
-    this->PointConverter->Delete();
-    }
-  if (this->PolyDataConverter)
-    {
-    UnregisterMessageConverter(this->PolyDataConverter);
-    this->PolyDataConverter->Delete();
-    }
-  if (this->TrackingDataConverter)
-    {
-    UnregisterMessageConverter(this->TrackingDataConverter);
-    this->TrackingDataConverter->Delete();
-    }
-  if (this->StatusConverter)
-    {
-    UnregisterMessageConverter(this->StatusConverter);
-    this->StatusConverter->Delete();
-    }
-  if (this->SensorConverter)
-    {
-    UnregisterMessageConverter(this->SensorConverter);
-    this->SensorConverter->Delete();
-    }
-  if (this->TrajectoryConverter)
-    {
-    UnregisterMessageConverter(this->TrajectoryConverter);
-    this->TrajectoryConverter->Delete();
-    }
-  if (this->StringConverter)
-    {
-    UnregisterMessageConverter(this->StringConverter);
-    this->StringConverter->Delete();
-    }
-
   if (this->DataCallbackCommand)
     {
     this->DataCallbackCommand->Delete();
@@ -239,19 +142,6 @@ void vtkSlicerOpenIGTLinkIFLogic::RemoveMRMLConnectorNodeObserver(vtkMRMLIGTLCon
 }
 
 //---------------------------------------------------------------------------
-void vtkSlicerOpenIGTLinkIFLogic::RegisterMessageConverters(vtkMRMLIGTLConnectorNode * connectorNode)
-{
-  if (!connectorNode)
-    {
-    return;
-    }
-  for (unsigned short i = 0; i < this->GetNumberOfConverters(); i ++)
-    {
-    connectorNode->RegisterMessageConverter(this->GetConverter(i));
-    }
-}
-
-//---------------------------------------------------------------------------
 void vtkSlicerOpenIGTLinkIFLogic::OnMRMLSceneEndImport()
 {
   // Scene loading/import is finished, so now start the command processing thread
@@ -287,9 +177,9 @@ void vtkSlicerOpenIGTLinkIFLogic::OnMRMLSceneNodeAdded(vtkMRMLNode* node)
     {
     // TODO Remove this line when the corresponding UI option will be added
     connectorNode->SetRestrictDeviceName(0);
-
+    connectorNode->SetOpenIGTLinkIFLogic(this);
+    
     this->AddMRMLConnectorNodeObserver(connectorNode);
-    this->RegisterMessageConverters(connectorNode);
     }
 }
 
@@ -365,62 +255,22 @@ int vtkSlicerOpenIGTLinkIFLogic::SetRestrictDeviceName(int f)
 }
 
 //---------------------------------------------------------------------------
-int vtkSlicerOpenIGTLinkIFLogic::RegisterMessageConverter(vtkIGTLToMRMLBase* converter)
+int vtkSlicerOpenIGTLinkIFLogic::RegisterMessageConverter(vtkMRMLIGTLConnectorNode * connectorNode)
 {
-  if (converter == NULL)
+  if (!connectorNode)
     {
     return 0;
     }
-
-  // Search the list and check if the same converter has already been registered.
-  int found = 0;
-
-  MessageConverterListType::iterator iter;
-  for (iter = this->MessageConverterList.begin();
-       iter != this->MessageConverterList.end();
-       iter ++)
+  for (unsigned short i = 0; i < this->GetNumberOfConverters(); i ++)
     {
-    if ((converter->GetIGTLName() && strcmp(converter->GetIGTLName(), (*iter)->GetIGTLName()) == 0) &&
-        (converter->GetMRMLName() && strcmp(converter->GetMRMLName(), (*iter)->GetMRMLName()) == 0))
+     if (!connectorNode->RegisterMessageConverter(this->GetConverter(i)))
       {
-      found = 1;
+       return 0;
       }
     }
-  if (found)
-    {
-    return 0;
-    }
-
-  if (converter->GetIGTLName() && converter->GetMRMLName())
-    // TODO: is this correct? Shouldn't it be "&&"
-    {
-    this->MessageConverterList.push_back(converter);
-    converter->SetOpenIGTLinkIFLogic(this);
-    }
-  else
-    {
-    return 0;
-    }
-
-  // Add the converter to the existing connectors
-  if (this->GetMRMLScene())
-    {
-    std::vector<vtkMRMLNode*> nodes;
-  this->GetMRMLScene()->GetNodesByClass("vtkMRMLIGTLConnectorNode", nodes);
-
-    std::vector<vtkMRMLNode*>::iterator niter;
-    for (niter = nodes.begin(); niter != nodes.end(); niter ++)
-      {
-      vtkMRMLIGTLConnectorNode* connector = vtkMRMLIGTLConnectorNode::SafeDownCast(*niter);
-      if (connector)
-        {
-        connector->RegisterMessageConverter(converter);
-        }
-      }
-    }
-
   return 1;
 }
+
 
 //---------------------------------------------------------------------------
 int vtkSlicerOpenIGTLinkIFLogic::UnregisterMessageConverter(vtkIGTLToMRMLBase* converter)
@@ -429,58 +279,35 @@ int vtkSlicerOpenIGTLinkIFLogic::UnregisterMessageConverter(vtkIGTLToMRMLBase* c
     {
     return 0;
     }
-
-  // Look up the message converter list
-  MessageConverterListType::iterator iter;
-  iter = this->MessageConverterList.begin();
-  while ((*iter) != converter) iter ++;
-
-  if (iter != this->MessageConverterList.end())
-    // if the converter is on the list
+  // Remove the converter from the existing connectors
+  std::vector<vtkMRMLNode*> nodes;
+  if (this->GetMRMLScene())
     {
-    this->MessageConverterList.erase(iter);
-    // Remove the converter from the existing connectors
-    std::vector<vtkMRMLNode*> nodes;
-    if (this->GetMRMLScene())
-      {
-      this->GetMRMLScene()->GetNodesByClass("vtkMRMLIGTLConnectorNode", nodes);
+    this->GetMRMLScene()->GetNodesByClass("vtkMRMLIGTLConnectorNode", nodes);
 
-      std::vector<vtkMRMLNode*>::iterator iter;
-      for (iter = nodes.begin(); iter != nodes.end(); iter ++)
+    std::vector<vtkMRMLNode*>::iterator iter;
+    for (iter = nodes.begin(); iter != nodes.end(); iter ++)
+      {
+      vtkMRMLIGTLConnectorNode* connector = vtkMRMLIGTLConnectorNode::SafeDownCast(*iter);
+      if (connector)
         {
-        vtkMRMLIGTLConnectorNode* connector = vtkMRMLIGTLConnectorNode::SafeDownCast(*iter);
-        if (connector)
-          {
-          connector->UnregisterMessageConverter(converter);
-          }
+        connector->UnregisterMessageConverter(converter);
         }
       }
-    return 1;
     }
-  else
-    {
-    return 0;
-    }
+  return 1;
 }
 
 //---------------------------------------------------------------------------
 unsigned int vtkSlicerOpenIGTLinkIFLogic::GetNumberOfConverters()
 {
-  return this->MessageConverterList.size();
+  return this->converterFactory->GetNumberOfConverters();
 }
 
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLBase* vtkSlicerOpenIGTLinkIFLogic::GetConverter(unsigned int i)
 {
-
-  if (i < this->MessageConverterList.size())
-    {
-    return this->MessageConverterList[i];
-    }
-  else
-    {
-    return NULL;
-    }
+  return this->converterFactory->GetConverter(i);
 }
 
 //---------------------------------------------------------------------------
@@ -492,55 +319,14 @@ vtkIGTLToMRMLBase* vtkSlicerOpenIGTLinkIFLogic::GetConverterByMRMLTag(const char
   // will be returned.
 
   vtkIGTLToMRMLBase* converter = NULL;
-
-  MessageConverterListType::iterator iter;
-  for (iter = this->MessageConverterList.begin();
-       iter != this->MessageConverterList.end();
-       iter ++)
-    {
-    if (strcmp((*iter)->GetMRMLName(), mrmlTag) == 0)
-      {
-      converter = *iter;
-      break;
-      }
-    }
-
+  converter = converterFactory->GetConverterByMRMLTag(mrmlTag);
   return converter;
 }
 
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLBase* vtkSlicerOpenIGTLinkIFLogic::GetConverterByDeviceType(const char* deviceType)
 {
-  vtkIGTLToMRMLBase* converter = NULL;
-
-  MessageConverterListType::iterator iter;
-  for (iter = this->MessageConverterList.begin();
-       iter != this->MessageConverterList.end();
-       iter ++)
-    {
-    if ((*iter)->GetConverterType() == vtkIGTLToMRMLBase::TYPE_NORMAL)
-      {
-      if (strcmp((*iter)->GetIGTLName(), deviceType) == 0)
-        {
-        converter = *iter;
-        break;
-        }
-      }
-    else
-      {
-      int n = (*iter)->GetNumberOfIGTLNames();
-      for (int i = 0; i < n; i ++)
-        {
-        if (strcmp((*iter)->GetIGTLName(i), deviceType) == 0)
-          {
-          converter = *iter;
-          break;
-          }
-        }
-      }
-    }
-
-  return converter;
+  return this->converterFactory->GetConverterByIGTLDeviceType(deviceType);
 }
 
 //---------------------------------------------------------------------------
@@ -564,7 +350,7 @@ void vtkSlicerOpenIGTLinkIFLogic::ProcessMRMLNodesEvents(vtkObject * caller, uns
         vtkMRMLNode* inode = cnode->GetIncomingMRMLNode(i);
         if (inode)
           {
-          vtkIGTLToMRMLBase* converter = GetConverterByMRMLTag(inode->GetNodeTagName());
+          vtkIGTLToMRMLBase* converter = cnode->GetConverterByMRMLTag(inode->GetNodeTagName());
           if (converter)
             {
             const char * attr = inode->GetAttribute("IGTLVisible");
@@ -587,7 +373,7 @@ void vtkSlicerOpenIGTLinkIFLogic::ProcessMRMLNodesEvents(vtkObject * caller, uns
         vtkMRMLNode* inode = cnode->GetOutgoingMRMLNode(i);
         if (inode)
           {
-          vtkIGTLToMRMLBase* converter = GetConverterByMRMLTag(inode->GetNodeTagName());
+          vtkIGTLToMRMLBase* converter = cnode->GetConverterByMRMLTag(inode->GetNodeTagName());
           if (converter)
             {
             const char * attr = inode->GetAttribute("IGTLVisible");
@@ -669,23 +455,21 @@ void vtkSlicerOpenIGTLinkIFLogic::GetDeviceNamesFromMrml(IGTLMrmlNodeListType &l
 {
 
   list.clear();
-
-  MessageConverterListType::iterator mcliter;
-  for (mcliter = this->MessageConverterList.begin();
-       mcliter != this->MessageConverterList.end();
-       mcliter ++)
+  
+  for (int index = 0; index<this->GetNumberOfConverters();index++)
     {
-    if ((*mcliter)->GetMRMLName())
+    vtkIGTLToMRMLBase* converter = this->GetConverter(index);
+    if (converter->GetMRMLName())
       {
-      std::string className = this->GetMRMLScene()->GetClassNameByTag((*mcliter)->GetMRMLName());
+      std::string className = this->GetMRMLScene()->GetClassNameByTag(converter->GetMRMLName());
       std::string deviceTypeName;
-      if ((*mcliter)->GetIGTLName() != NULL)
+      if (converter->GetIGTLName() != NULL)
         {
-        deviceTypeName = (*mcliter)->GetIGTLName();
+        deviceTypeName = converter->GetIGTLName();
         }
       else
         {
-        deviceTypeName = (*mcliter)->GetMRMLName();
+        deviceTypeName = converter->GetMRMLName();
         }
       std::vector<vtkMRMLNode*> nodes;
       this->GetApplicationLogic()->GetMRMLScene()->GetNodesByClass(className.c_str(), nodes);
@@ -708,16 +492,13 @@ void vtkSlicerOpenIGTLinkIFLogic::GetDeviceNamesFromMrml(IGTLMrmlNodeListType &l
 {
 
   list.clear();
-
-  MessageConverterListType::iterator mcliter;
-  for (mcliter = this->MessageConverterList.begin();
-       mcliter != this->MessageConverterList.end();
-       mcliter ++)
+  for (int index = 0; index<this->GetNumberOfConverters();index++)
     {
-    if ((*mcliter)->GetMRMLName() && strcmp(mrmlTagName, (*mcliter)->GetMRMLName()) == 0)
+    vtkIGTLToMRMLBase* converter = this->GetConverter(index);
+    if (converter->GetMRMLName() && strcmp(mrmlTagName, converter->GetMRMLName()) == 0)
       {
       const char* className = this->GetMRMLScene()->GetClassNameByTag(mrmlTagName);
-      const char* deviceTypeName = (*mcliter)->GetIGTLName();
+      const char* deviceTypeName = converter->GetIGTLName();
       std::vector<vtkMRMLNode*> nodes;
       this->GetMRMLScene()->GetNodesByClass(className, nodes);
       std::vector<vtkMRMLNode*>::iterator iter;

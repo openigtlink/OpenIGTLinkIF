@@ -24,9 +24,8 @@
 #include <vtkMRMLColorTableNode.h>
 
 // MRML includes
-#include <vtkMRMLScalarVolumeNode.h>
-#include <vtkMRMLScalarVolumeDisplayNode.h>
-#include <vtkMRMLVectorVolumeDisplayNode.h>
+#include <vtkMRMLModelNode.h>
+#include <vtkMRMLModelDisplayNode.h>
 
 // VTK includes
 #include <vtkPolyData.h>

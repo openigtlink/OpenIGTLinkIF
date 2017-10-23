@@ -18,6 +18,7 @@
 #include "vtkIGTLToMRMLBase.h"
 #include "vtkMRMLIGTLQueryNode.h"
 #include "vtkSlicerOpenIGTLinkIFModuleMRMLExport.h"
+#include "vtkIGTLTOMRMLConverterFactory.h"
 
 // OpenIGTLink includes
 #include <igtlServerSocket.h>
@@ -42,6 +43,7 @@
 class vtkMultiThreader;
 class vtkMutexLock;
 class vtkIGTLCircularBuffer;
+class vtkSlicerOpenIGTLinkIFLogic;
 
 class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : public vtkMRMLNode
 {
@@ -107,10 +109,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   typedef std::map<int, DeviceInfoType>   DeviceInfoMapType;   // Device list:  index is referred as
                                                                // a device id in the connector.
   typedef std::set<int>                   DeviceIDSetType;
-  typedef std::list< vtkSmartPointer<vtkIGTLToMRMLBase> >   MessageConverterListType;
   typedef std::vector< vtkSmartPointer<vtkMRMLNode> >       MRMLNodeListType;
   typedef std::map<std::string, NodeInfoType>       NodeInfoMapType;
-  typedef std::map<std::string, vtkSmartPointer <vtkIGTLToMRMLBase> > MessageConverterMapType;
 
  public:
 
@@ -243,16 +243,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   void PushOutgoingMessages();
 
   // Description:
-  // Register IGTL to MRML message converter.
-  // This is used by vtkOpenIGTLinkIFLogic class.
-  int RegisterMessageConverter(vtkIGTLToMRMLBase* converter);
-
-  // Description:
-  // Unregister IGTL to MRML message converter.
-  // This is used by vtkOpenIGTLinkIFLogic class.
-  void UnregisterMessageConverter(vtkIGTLToMRMLBase* converter);
-
-  // Description:
   // Set and start observing MRML node for outgoing data.
   // If devType == NULL, a converter is chosen based only on MRML Tag.
   int RegisterOutgoingMRMLNode(vtkMRMLNode* node, const char* devType=NULL);
@@ -321,11 +311,23 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   // Get OpenIGTLink's time stamp information. Returns 0, if it fails to obtain time stamp.
   int GetIGTLTimeStamp(vtkMRMLNode* node, int& second, int& nanosecond);
 
+  // Description:
+  // Set the logic of OpenIGTLinkIF
+  void SetOpenIGTLinkIFLogic(vtkSlicerOpenIGTLinkIFLogic* logic);
 
- protected:
+
+  // Description:
+  // Get the logic of OpenIGTLinkIF
+  vtkSlicerOpenIGTLinkIFLogic* GetOpenIGTLinkIFLogic();
 
   vtkIGTLToMRMLBase* GetConverterByMRMLTag(const char* tag);
   vtkIGTLToMRMLBase* GetConverterByIGTLDeviceType(const char* type);
+
+  int RegisterMessageConverter(vtkIGTLToMRMLBase* converter);
+
+  int UnregisterMessageConverter(vtkIGTLToMRMLBase* converter);
+
+ protected:
 
   // Description:
   // Inserts the eventId to the EventQueue, and the event will be invoked from the main thread
@@ -419,9 +421,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   DeviceIDSetType   UnspecifiedDeviceIDSet;
 
   // Message converter (IGTLToMRML)
-  MessageConverterListType MessageConverterList;
-  MessageConverterMapType  IGTLNameToConverterMap;
-  MessageConverterMapType  MRMLIDToConverterMap;
+  vtkIGTLToMRMLConverterFactory* converterFactory;
 
   // List of nodes that this connector node is observing.
   //MRMLNodeListType         OutgoingMRMLNodeList;      // TODO: -> ReferenceList
@@ -429,6 +429,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   NodeInfoMapType          IncomingMRMLNodeInfoMap;
 
   int CheckCRC;
+
+  vtkSlicerOpenIGTLinkIFLogic* OpenIGTLinkIFLogic;
 
 };
 
