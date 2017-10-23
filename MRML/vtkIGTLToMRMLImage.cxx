@@ -48,6 +48,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLImage);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLImage::vtkIGTLToMRMLImage()
 {
+  this->InImageMessage = igtl::ImageMessage::New();
+  this->mrmlNodeTagName = "Volume";
 }
 
 //---------------------------------------------------------------------------
@@ -115,31 +117,49 @@ void vtkIGTLToMRMLImage::SetDefaultDisplayNode(vtkMRMLVolumeNode *volumeNode, in
 }
 
 //---------------------------------------------------------------------------
-vtkMRMLNode* vtkIGTLToMRMLImage::CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer incomingImageMessage)
+int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  igtl::MessageBase* innerPtr = incomingImageMessage.GetPointer();
-  if( innerPtr == NULL )
+  if (message.IsNull())
     {
-    vtkErrorMacro("Unable to create MRML node from incoming IMAGE message: incomingImageMessage is invalid");
+    // TODO: error handling
     return 0;
     }
-
-  igtl::ImageMessage::Pointer imgMsg = igtl::ImageMessage::New();
-  // As this method is only called when the first image message is received,
-  // (it is called when receiving each image message) the performance impact of the
-  // additional Copy() and Unpack() method calls are negligible.
-  imgMsg->Copy(incomingImageMessage.GetPointer());
+  this->InImageMessage->Copy(message); // !! TODO: copy makes performance issue.
+  
   // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.
-  int c = imgMsg->Unpack(this->CheckCRC);
+  int c = this->InImageMessage->Unpack(this->CheckCRC);
   if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
-    vtkErrorMacro("Unable to create MRML node from incoming IMAGE message. Failed to unpack the message");
+    // TODO: error handling
     return 0;
     }
+  this->mrmlNodeTagName = "";
+  if(this->InImageMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
+    {
+    this->InImageMessage->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
+    }
+  else if(this->InImageMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+    {
+    int numberOfComponents=this->InImageMessage->GetNumComponents();
+    if (numberOfComponents == 1)
+      {
+      this->mrmlNodeTagName = "Volume";
+      }
+    else if (numberOfComponents > 1)
+      {
+      this->mrmlNodeTagName = "VectorVolume";
+      }
+    }
+  return 1;
+}
 
+//---------------------------------------------------------------------------
+vtkMRMLNode* vtkIGTLToMRMLImage::CreateNewNode(vtkMRMLScene* scene, const char* name)
+{
   vtkSmartPointer<vtkImageData> image = vtkSmartPointer<vtkImageData>::New();
-  int numberOfComponents=imgMsg->GetNumComponents();
+  vtkSmartPointer<vtkMRMLVolumeNode> volumeNode;
+  int numberOfComponents=this->InImageMessage->GetNumComponents();
   //float fov = 256.0;
   image->SetDimensions(256, 256, 1);
   image->SetExtent(0, 255, 0, 255, 0, 0 );
@@ -154,53 +174,45 @@ vtkMRMLNode* vtkIGTLToMRMLImage::CreateNewNodeWithMessage(vtkMRMLScene* scene, c
 #else
   image->AllocateScalars(VTK_SHORT, numberOfComponents);
 #endif
-
+  
   short* dest = (short*) image->GetScalarPointer();
   if (dest)
     {
-    memset(dest, 0x00, 256*256*sizeof(short));
+    memset(dest, 0x00, 256*256*sizeof(short)*numberOfComponents);
 #if (VTK_MAJOR_VERSION <= 5)
     image->Update();
 #endif
     }
-  vtkSmartPointer<vtkMRMLVolumeNode> volumeNode;
-  if (numberOfComponents == 1)
-  {
-    volumeNode = vtkSmartPointer<vtkMRMLScalarVolumeNode>::New();
-  }
-  else if (numberOfComponents > 1)
-  {
-    volumeNode = vtkSmartPointer<vtkMRMLVectorVolumeNode>::New();
-  }
-  volumeNode->SetAndObserveImageData(image);
-  volumeNode->SetName(name);
+  vtkMRMLNode* node = this->CreateMRMLNodeBaseOnTagName(scene);
+  if (node)
+    {
+    volumeNode = vtkMRMLVolumeNode::SafeDownCast(node);
+    volumeNode->SetAndObserveImageData(image);
+    volumeNode->SetName(name);
 
-  scene->SaveStateForUndo();
+    scene->SaveStateForUndo();
 
-  vtkDebugMacro("Setting scene info");
-  volumeNode->SetScene(scene);
-  volumeNode->SetDescription("Received by OpenIGTLink");
+    vtkDebugMacro("Setting scene info");
+    volumeNode->SetScene(scene);
+    volumeNode->SetDescription("Received by OpenIGTLink");
 
-  ///double range[2];
-  vtkDebugMacro("Set basic display info");
-  //volumeNode->GetImageData()->GetScalarRange(range);
-  //range[0] = 0.0;
-  //range[1] = 256.0;
-  //displayNode->SetLowerThreshold(range[0]);
-  //displayNode->SetUpperThreshold(range[1]);
-  //displayNode->SetWindow(range[1] - range[0]);
-  //displayNode->SetLevel(0.5 * (range[1] + range[0]) );
+    ///double range[2];
+    vtkDebugMacro("Set basic display info");
+    vtkDebugMacro("Name vol node "<<volumeNode->GetClassName());
+    vtkMRMLNode* n = scene->AddNode(volumeNode);
 
-  vtkDebugMacro("Name vol node "<<volumeNode->GetClassName());
-  vtkMRMLNode* n = scene->AddNode(volumeNode);
+    this->SetDefaultDisplayNode(volumeNode, numberOfComponents);
 
-  this->SetDefaultDisplayNode(volumeNode, numberOfComponents);
+    vtkDebugMacro("Node added to scene");
 
-  vtkDebugMacro("Node added to scene");
+    this->CenterImage(volumeNode);
 
-  this->CenterImage(volumeNode);
-
-  return n;
+    return n;
+    }
+  else
+    {
+    return NULL;
+    }
 }
 
 //---------------------------------------------------------------------------
@@ -255,29 +267,7 @@ int swapCopy64(igtlUint64 * dst, igtlUint64 * src, int n)
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer buffer)
-{
-  if (this->InImageMessage.IsNull())
-    {
-    this->InImageMessage = igtl::ImageMessage::New();
-    }
-  this->InImageMessage->Copy(buffer);
-
-  // Deserialize the transform data
-  // If CheckCRC==0, CRC check is skipped.
-  int c = this->InImageMessage->Unpack(this->CheckCRC);
-
-  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
-    {
-    // TODO: error handling
-    return 0;
-    }
-  return 1;
-}
-
-
-//---------------------------------------------------------------------------
-int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLImage::IGTLToMRML(vtkMRMLNode* node)
 {
   vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(node);
   if (volumeNode==NULL)
@@ -295,10 +285,6 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
   int   numComponents;    // number of scalar components
   int   endian;
   igtl::Matrix4x4 matrix; // Image origin and orientation matrix
-  if(this->InImageMessage.IsNull())
-  {
-    this->UnpackIGTLMessage(buffer);
-  }
   scalarType = IGTLToVTKScalarType( this->InImageMessage->GetScalarType() );
   endian = this->InImageMessage->GetEndian();
   this->InImageMessage->GetDimensions(size);
@@ -574,15 +560,16 @@ int vtkIGTLToMRMLImage::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNod
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (!mrmlNode)
     {
     return 0;
     }
 
+  bool isMRMLSupported = this->CheckIfMRMLSupported(mrmlNode->GetNodeTagName());
   // If mrmlNode is Image node
-  if (event == vtkMRMLVolumeNode::ImageDataModifiedEvent && strcmp(mrmlNode->GetNodeTagName(), "Volume") == 0)
+  if (event == vtkMRMLVolumeNode::ImageDataModifiedEvent && isMRMLSupported)
     {
     vtkMRMLVolumeNode* volumeNode =
       vtkMRMLVolumeNode::SafeDownCast(mrmlNode);
@@ -620,6 +607,9 @@ int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
       {
       this->OutImageMessage = igtl::ImageMessage::New();
       }
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutImageMessage->SetHeaderVersion(headerVersion);
+    this->OutImageMessage->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutImageMessage->SetDimensions(isize);
     this->OutImageMessage->SetSpacing((float)spacing[0], (float)spacing[1], (float)spacing[2]);
     this->OutImageMessage->SetScalarType(scalarType);
@@ -628,7 +618,7 @@ int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
     this->OutImageMessage->SetSubVolume(isize, svoffset);
     this->OutImageMessage->SetNumComponents(ncomp);
     this->OutImageMessage->AllocateScalars();
-
+    
     memcpy(this->OutImageMessage->GetScalarPointer(),
            imageData->GetScalarPointer(),
            this->OutImageMessage->GetImageSize());
@@ -702,6 +692,8 @@ int vtkIGTLToMRMLImage::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, i
           {
           this->GetImageMessage = igtl::GetImageMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->GetImageMessage->SetHeaderVersion(headerVersion);
         this->GetImageMessage->SetDeviceName(qnode->GetIGTLDeviceName());
         this->GetImageMessage->Pack();
         *size = this->GetImageMessage->GetPackSize();

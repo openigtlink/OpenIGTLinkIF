@@ -35,19 +35,24 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLSensor : public v
   void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
 
   virtual const char*  GetIGTLName() VTK_OVERRIDE { return "SENSOR"; };
-  virtual const char*  GetMRMLName() VTK_OVERRIDE { return "IGTLSensor"; };
+  virtual std::vector<std::string>  GetAllMRMLNames() VTK_OVERRIDE
+  {
+    this->MRMLNames.clear();
+    this->MRMLNames.push_back("IGTLSensor");
+    return this->MRMLNames;
+  }
   virtual vtkIntArray* GetNodeEvents() VTK_OVERRIDE;
-  virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name) VTK_OVERRIDE;
 
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node) VTK_OVERRIDE;
-  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg) VTK_OVERRIDE;
-
+  virtual int          IGTLToMRML(vtkMRMLNode* node) VTK_OVERRIDE;
+  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg,  bool useProtocolV2) VTK_OVERRIDE;
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer) VTK_OVERRIDE;
 
  protected:
   vtkIGTLToMRMLSensor();
   ~vtkIGTLToMRMLSensor();
 
  protected:
+  igtl::SensorMessage::Pointer InSensorMsg;
   igtl::SensorMessage::Pointer OutSensorMsg;
 
 };

@@ -27,7 +27,9 @@ vtkStandardNewMacro(vtkIGTLToMRMLString);
 vtkIGTLToMRMLString
 ::vtkIGTLToMRMLString()
 {
-  this->IGTLNames.clear();
+  this->IGTLNames.clear(); //???? why clear IGTLNames
+  this->InStringMsg = igtl::StringMessage::New();
+  this->mrmlNodeTagName = "Text";
 }
 
 //---------------------------------------------------------------------------
@@ -43,19 +45,6 @@ void vtkIGTLToMRMLString::PrintSelf( ostream& os, vtkIndent indent )
 }
 
 //---------------------------------------------------------------------------
-vtkMRMLNode* vtkIGTLToMRMLString
-::CreateNewNode( vtkMRMLScene* scene, const char* name )
-{
-  vtkSmartPointer< vtkMRMLTextNode > textNode = vtkSmartPointer< vtkMRMLTextNode >::New();
-  textNode->SetName( name );
-  textNode->SetDescription( "Created by OpenIGTLinkIF module" );
-
-  scene->AddNode( textNode );
-
-  return textNode;
-}
-
-//---------------------------------------------------------------------------
 vtkIntArray* vtkIGTLToMRMLString
 ::GetNodeEvents()
 {
@@ -68,30 +57,34 @@ vtkIntArray* vtkIGTLToMRMLString
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLString
-::IGTLToMRML( igtl::MessageBase::Pointer buffer, vtkMRMLNode* node )
+int vtkIGTLToMRMLString::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  vtkIGTLToMRMLBase::IGTLToMRML( buffer, node );
-
+  this->InStringMsg->Copy(message);
+  
+  // Deserialize the transform data
+  // If CheckCRC==0, CRC check is skipped.
+  int c = this->InStringMsg->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
+    {
+    // TODO: error handling
+    return 0;
+    }
+  return 1;
+}
+  
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLString::IGTLToMRML(vtkMRMLNode* node )
+{
   if ( node == NULL )
     {
     return 0;
     }
 
-  // Create message buffer to receive data.
-
-  igtl::StringMessage::Pointer stringMessage;
-  stringMessage = igtl::StringMessage::New();
-  stringMessage->Copy( buffer );
-
-  int c = stringMessage->Unpack( this->CheckCRC );
-
-  if ( ! ( c & igtl::MessageHeader::UNPACK_BODY ) )
-    {
-    vtkErrorMacro( "Incoming IGTL string message failed CRC check!" );
-    return 0;
-    }
-
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InStringMsg->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
+  
   vtkMRMLTextNode* textNode = vtkMRMLTextNode::SafeDownCast( node );
   if ( textNode == NULL )
     {
@@ -100,8 +93,8 @@ int vtkIGTLToMRMLString
     }
 
   int oldModify = textNode->StartModify();
-  textNode->SetText(stringMessage->GetString());
-  textNode->SetEncoding(stringMessage->GetEncoding());
+  textNode->SetText(this->InStringMsg->GetString());
+  textNode->SetEncoding(this->InStringMsg->GetEncoding());
   textNode->EndModify(oldModify);
 
   return 1;
@@ -109,7 +102,7 @@ int vtkIGTLToMRMLString
 
 //---------------------------------------------------------------------------
 int vtkIGTLToMRMLString
-::MRMLToIGTL( unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg )
+::MRMLToIGTL( unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if ( mrmlNode == NULL )
     {
@@ -145,6 +138,9 @@ int vtkIGTLToMRMLString
       {
       this->StringMsg = igtl::StringMessage::New();
       }
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->StringMsg->SetHeaderVersion(headerVersion);
+    this->StringMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->StringMsg->SetDeviceName( deviceName );
     this->StringMsg->SetString( text );
     this->StringMsg->SetEncoding( encoding );

@@ -37,14 +37,16 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLImageMetaList : p
   void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
 
   virtual const char*  GetIGTLName() VTK_OVERRIDE { return "IMGMETA"; };
-  virtual const char*  GetMRMLName() VTK_OVERRIDE { return "ImageMetaList"; };
-
+	virtual std::vector<std::string>  GetAllMRMLNames() VTK_OVERRIDE
+  {
+    this->MRMLNames.clear();
+    this->MRMLNames.push_back("ImageMetaList");
+    return this->MRMLNames;
+  }
   virtual vtkIntArray* GetNodeEvents() VTK_OVERRIDE;
-  virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name) VTK_OVERRIDE;
-
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node) VTK_OVERRIDE;
-  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg) VTK_OVERRIDE;
-
+  virtual int          IGTLToMRML(vtkMRMLNode* node) VTK_OVERRIDE;
+  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg,  bool useProtocolV2) VTK_OVERRIDE;
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer message) VTK_OVERRIDE;
 
  protected:
   vtkIGTLToMRMLImageMetaList();
@@ -53,7 +55,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLImageMetaList : p
   void CenterImage(vtkMRMLVolumeNode *volumeNode);
 
  protected:
-
+  igtl::ImageMetaMessage::Pointer InImageMetaMessage;
   //igtl::TransformMessage::Pointer OutTransformMsg;
   igtl::ImageMetaMessage::Pointer OutImageMetaMsg;
   igtl::GetImageMetaMessage::Pointer GetImageMetaMessage;

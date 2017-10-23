@@ -50,6 +50,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLLinearTransform);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLLinearTransform::vtkIGTLToMRMLLinearTransform()
 {
+  this->InTransformMsg = igtl::TransformMessage::New();
+  this->mrmlNodeTagName = "LinearTransform";
 }
 
 //---------------------------------------------------------------------------
@@ -96,24 +98,34 @@ vtkIntArray* vtkIGTLToMRMLLinearTransform::GetNodeEvents()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLLinearTransform::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLLinearTransform::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
-
-  // Create a message buffer to receive transform data
-  igtl::TransformMessage::Pointer transMsg;
-  transMsg = igtl::TransformMessage::New();
-  transMsg->Copy(buffer);  // !! TODO: copy makes performance issue.
-
-  // Deserialize the transform data
-  // If CheckCRC==0, CRC check is skipped.
-  int c = transMsg->Unpack(this->CheckCRC);
-
-  if (!(c & igtl::MessageHeader::UNPACK_BODY)) // if CRC check fails
+  if (message.IsNull())
     {
     // TODO: error handling
     return 0;
     }
+  this->InTransformMsg->Copy(message);
+  
+  // Deserialize the transform data
+  // If CheckCRC==0, CRC check is skipped.
+  int c = this->InTransformMsg->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
+    {
+    // TODO: error handling
+    return 0;
+    }
+  return 1;
+}
+
+
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLLinearTransform::IGTLToMRML(vtkMRMLNode* node)
+{
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InTransformMsg->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
 
   if (node == NULL)
     {
@@ -124,7 +136,7 @@ int vtkIGTLToMRMLLinearTransform::IGTLToMRML(igtl::MessageBase::Pointer buffer, 
     vtkMRMLLinearTransformNode::SafeDownCast(node);
 
   igtl::Matrix4x4 matrix;
-  transMsg->GetMatrix(matrix);
+  this->InTransformMsg->GetMatrix(matrix);
 
   float tx = matrix[0][0];
   float ty = matrix[1][0];
@@ -173,7 +185,7 @@ int vtkIGTLToMRMLLinearTransform::IGTLToMRML(igtl::MessageBase::Pointer buffer, 
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (mrmlNode && event == vtkMRMLTransformableNode::TransformModifiedEvent)
     {
@@ -187,7 +199,9 @@ int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* m
       {
       this->OutTransformMsg = igtl::TransformMessage::New();
       }
-
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutTransformMsg->SetHeaderVersion(headerVersion);
+    this->OutTransformMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutTransformMsg->SetDeviceName(mrmlNode->GetName());
 
     igtl::Matrix4x4 igtlmatrix;
@@ -210,6 +224,7 @@ int vtkIGTLToMRMLLinearTransform::MRMLToIGTL(unsigned long event, vtkMRMLNode* m
     igtlmatrix[3][3]  = matrix->Element[3][3];
 
     this->OutTransformMsg->SetMatrix(igtlmatrix);
+    this->OutTransformMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutTransformMsg->Pack();
 
     *size = this->OutTransformMsg->GetPackSize();

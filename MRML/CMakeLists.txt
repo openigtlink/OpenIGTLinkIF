@@ -17,6 +17,7 @@ set(${KIT}_SRCS
   vtkIGTLToMRMLLinearTransform.cxx
   vtkIGTLToMRMLPosition.cxx
   vtkIGTLToMRMLStatus.cxx
+  vtkIGTLToMRMLConverterFactory.cxx
   vtkMRMLIGTLConnectorNode.cxx
   vtkMRMLIGTLStatusNode.cxx
   )

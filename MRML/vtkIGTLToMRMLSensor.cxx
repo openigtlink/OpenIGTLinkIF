@@ -33,6 +33,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLSensor);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLSensor::vtkIGTLToMRMLSensor()
 {
+  this->InSensorMsg = igtl::SensorMessage::New();
+  this->mrmlNodeTagName = "IGTLSensor";
 }
 
 //---------------------------------------------------------------------------
@@ -47,21 +49,6 @@ void vtkIGTLToMRMLSensor::PrintSelf(ostream& os, vtkIndent indent)
 }
 
 //---------------------------------------------------------------------------
-vtkMRMLNode* vtkIGTLToMRMLSensor::CreateNewNode(vtkMRMLScene* scene, const char* name)
-{
-  vtkMRMLIGTLSensorNode* sensorNode;
-
-  sensorNode = vtkMRMLIGTLSensorNode::New();
-  sensorNode->SetName(name);
-  sensorNode->SetDescription("Received by OpenIGTLink");
-
-  vtkMRMLNode* n = scene->AddNode(sensorNode);
-  sensorNode->Delete();
-
-  return n;
-}
-
-//---------------------------------------------------------------------------
 vtkIntArray* vtkIGTLToMRMLSensor::GetNodeEvents()
 {
   vtkIntArray* events;
@@ -73,25 +60,29 @@ vtkIntArray* vtkIGTLToMRMLSensor::GetNodeEvents()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLSensor::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLSensor::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
-
-  // Create a message buffer to receive transform data
-  igtl::SensorMessage::Pointer sensorMsg;
-  sensorMsg = igtl::SensorMessage::New();
-  sensorMsg->Copy(buffer);  // !! TODO: copy makes performance issue.
-
+  this->InSensorMsg->Copy(message);
+  
   // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.
-  int c = sensorMsg->Unpack(this->CheckCRC);
-
-  if (!(c & igtl::MessageHeader::UNPACK_BODY)) // if CRC check fails
+  int c = this->InSensorMsg->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
     // TODO: error handling
     return 0;
     }
-
+  return 1;
+}
+  
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLSensor::IGTLToMRML(vtkMRMLNode* node)
+{
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InSensorMsg->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
+  
   if (node == NULL)
     {
     return 0;
@@ -103,11 +94,11 @@ int vtkIGTLToMRMLSensor::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNo
   // Only update sensor node when all data have been set
   int disabledModify = sensorNode->StartModify();
 
-  sensorNode->SetArrayLength(sensorMsg->GetLength());
-  sensorNode->SetDataUnit(sensorMsg->GetUnit());
-  for (unsigned int i = 0; i < sensorMsg->GetLength(); ++i)
+  sensorNode->SetArrayLength(this->InSensorMsg->GetLength());
+  sensorNode->SetDataUnit(this->InSensorMsg->GetUnit());
+  for (unsigned int i = 0; i < this->InSensorMsg->GetLength(); ++i)
     {
-    sensorNode->SetDataValue(i, sensorMsg->GetValue(i));
+    sensorNode->SetDataValue(i, this->InSensorMsg->GetValue(i));
     }
 
   sensorNode->EndModify(disabledModify);
@@ -117,7 +108,7 @@ int vtkIGTLToMRMLSensor::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNo
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLSensor::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLSensor::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (mrmlNode && event == vtkMRMLIGTLSensorNode::SensorModifiedEvent)
     {
@@ -133,7 +124,9 @@ int vtkIGTLToMRMLSensor::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, 
       {
       this->OutSensorMsg = igtl::SensorMessage::New();
       }
-
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutSensorMsg->SetHeaderVersion(headerVersion);
+    this->OutSensorMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutSensorMsg->SetDeviceName(sensorNode->GetName());
     this->OutSensorMsg->SetLength(sensorNode->GetArrayLength());
     this->OutSensorMsg->SetUnit(sensorNode->GetDataUnit());

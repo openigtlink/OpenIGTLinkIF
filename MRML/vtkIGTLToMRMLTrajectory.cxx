@@ -32,6 +32,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLTrajectory);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLTrajectory::vtkIGTLToMRMLTrajectory()
 {
+  this->InTrajectoryMsg = igtl::TrajectoryMessage::New();
+  this->mrmlNodeTagName = "AnnotationHierarchyNode";
 }
 
 //---------------------------------------------------------------------------
@@ -48,18 +50,10 @@ void vtkIGTLToMRMLTrajectory::PrintSelf(ostream& os, vtkIndent indent)
 //---------------------------------------------------------------------------
 vtkMRMLNode* vtkIGTLToMRMLTrajectory::CreateNewNode(vtkMRMLScene* scene, const char* name)
 {
-  vtkMRMLAnnotationHierarchyNode* hierarchyNode;
-
-  hierarchyNode = vtkMRMLAnnotationHierarchyNode::New();
-  hierarchyNode->SetName(name);
-  hierarchyNode->SetDescription("Received by OpenIGTLink");
-  hierarchyNode->SetParentNodeID(NULL);
+  vtkMRMLNode* node = vtkIGTLToMRMLBase::CreateNewNode(scene, name);
+  vtkMRMLAnnotationHierarchyNode* hierarchyNode = vtkMRMLAnnotationHierarchyNode::SafeDownCast(node);
   hierarchyNode->HideFromEditorsOff();
-
-  vtkMRMLNode* n = scene->AddNode(hierarchyNode);
-  hierarchyNode->Delete();
-
-  return n;
+  return hierarchyNode;
 }
 
 //---------------------------------------------------------------------------
@@ -74,26 +68,31 @@ vtkIntArray* vtkIGTLToMRMLTrajectory::GetNodeEvents()
   return events;
 }
 
+
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLTrajectory::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLTrajectory::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
 {
-  vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
-
-  // Create a message buffer to receive transform data
-  igtl::TrajectoryMessage::Pointer trajMsg;
-  trajMsg = igtl::TrajectoryMessage::New();
-  trajMsg->Copy(buffer);  // !! TODO: copy makes performance issue.
-
+  this->InTrajectoryMsg->Copy(message);
+  
   // Deserialize the transform data
   // If CheckCRC==0, CRC check is skipped.
-  int c = trajMsg->Unpack(this->CheckCRC);
-
-  if (!(c & igtl::MessageHeader::UNPACK_BODY)) // if CRC check fails
+  int c = this->InTrajectoryMsg->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
     {
     // TODO: error handling
     return 0;
     }
+  return 1;
+}
 
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLTrajectory::IGTLToMRML(vtkMRMLNode* node)
+{
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InTrajectoryMsg->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
+  
   if (node == NULL)
     {
     return 0;
@@ -107,15 +106,15 @@ int vtkIGTLToMRMLTrajectory::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMR
     }
 
   // Update hierarchy node
-  int nOfTrajectories = trajMsg->GetNumberOfTrajectoryElement();
+  int nOfTrajectories = this->InTrajectoryMsg->GetNumberOfTrajectoryElement();
   for (int i = 0; i < nOfTrajectories; ++i)
     {
     igtl::TrajectoryElement::Pointer tElemt;
-    trajMsg->GetTrajectoryElement(i, tElemt);
+    this->InTrajectoryMsg->GetTrajectoryElement(i, tElemt);
 
     if (tElemt.IsNotNull())
       {
-      this->CrossCheckTrajectoryName(tElemt, trajMsg);
+      this->CrossCheckTrajectoryName(tElemt, this->InTrajectoryMsg);
       this->AddTrajectoryElement(tElemt, hierarchyNode);
       }
     }
@@ -124,7 +123,7 @@ int vtkIGTLToMRMLTrajectory::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMR
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLTrajectory::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLTrajectory::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
 
   if (mrmlNode && (event == vtkMRMLHierarchyNode::ChildNodeAddedEvent ||
@@ -142,7 +141,9 @@ int vtkIGTLToMRMLTrajectory::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNo
       {
       this->OutTrajectoryMsg = igtl::TrajectoryMessage::New();
       }
-
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutTrajectoryMsg->SetHeaderVersion(headerVersion);
+    this->OutTrajectoryMsg->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     this->OutTrajectoryMsg->SetDeviceName(hierarchyNode->GetName());
 
     // Add all trajectory elements from hierarchy node

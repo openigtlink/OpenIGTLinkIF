@@ -114,20 +114,47 @@ vtkSlicerOpenIGTLinkIFLogic* vtkIGTLToMRMLBase::GetOpenIGTLinkIFLogic()
 }
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLBase::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+vtkMRMLNode* vtkIGTLToMRMLBase::CreateMRMLNodeBaseOnTagName(vtkMRMLScene* scene)
 {
-  if(buffer && node)
+  if (this->mrmlNodeTagName.c_str())
     {
-      igtlUint32 second;
-      igtlUint32 nanosecond;
-      
-      buffer->GetTimeStamp(&second, &nanosecond);
-      
-      std::stringstream ss;
-      ss << second << nanosecond;
-      
-      node->SetAttribute("Timestamp",ss.str().c_str());
+    if(this->CheckIfMRMLSupported(this->mrmlNodeTagName.c_str()))
+      {
+      std::string className = scene->GetClassNameByTag(this->mrmlNodeTagName.c_str());
+      vtkMRMLNode* node = scene->CreateNodeByClass(className.c_str());
+      return node;
+      }
+    else
+      {
+      return NULL;
+      }
     }
-  return 0;
+  return NULL;
 }
 
+bool vtkIGTLToMRMLBase::CheckIfMRMLSupported(const char* nodeTagName)
+{
+  bool isMRMLSupported = false;
+  for (int iName = 0; iName < this->GetAllMRMLNames().size(); iName++)
+  {
+    if (strcmp(nodeTagName, this->GetAllMRMLNames()[iName].c_str()) == 0)
+    {
+      isMRMLSupported = true;
+      break;
+    }
+  }
+  return isMRMLSupported;
+}
+
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLBase::SetNodeTimeStamp(igtlUint32 second, igtlUint32 nanosecond, vtkMRMLNode* node)
+{
+  if(node)
+  {
+    std::stringstream ss;
+    ss << second << nanosecond;
+    
+    node->SetAttribute("Timestamp",ss.str().c_str());
+  }
+  return 0;
+}

@@ -37,6 +37,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLTrackingData);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLTrackingData::vtkIGTLToMRMLTrackingData()
 {
+  this->InTrackingMetaMsg = igtl::TrackingDataMessage::New();
+  this->mrmlNodeTagName = "IGTLTrackingDataSplitter";
 }
 
 
@@ -54,20 +56,6 @@ void vtkIGTLToMRMLTrackingData::PrintSelf(ostream& os, vtkIndent indent)
 
 
 //---------------------------------------------------------------------------
-vtkMRMLNode* vtkIGTLToMRMLTrackingData::CreateNewNode(vtkMRMLScene* scene, const char* name)
-{
-
-  vtkMRMLIGTLTrackingDataBundleNode *node = vtkMRMLIGTLTrackingDataBundleNode::New();
-  node->SetName(name);
-  node->SetDescription("Received by OpenIGTLink");
-
-  scene->AddNode(node);
-  node->Delete();
-  return node;
-}
-
-
-//---------------------------------------------------------------------------
 vtkIntArray* vtkIGTLToMRMLTrackingData::GetNodeEvents()
 {
   vtkIntArray* events;
@@ -78,9 +66,24 @@ vtkIntArray* vtkIGTLToMRMLTrackingData::GetNodeEvents()
   return events;
 }
 
-
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLTrackingData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLTrackingData::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
+{
+  this->InTrackingMetaMsg->Copy(message);
+  
+  // Deserialize the transform data
+  // If CheckCRC==0, CRC check is skipped.
+  int c = this->InTrackingMetaMsg->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
+    {
+    // TODO: error handling
+    return 0;
+    }
+  return 1;
+}
+  
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLTrackingData::IGTLToMRML(vtkMRMLNode* node)
 {
 
   if (strcmp(node->GetNodeTagName(), "IGTLTrackingDataSplitter") != 0)
@@ -88,51 +91,40 @@ int vtkIGTLToMRMLTrackingData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtk
     //std::cerr << "Invalid node!!!!" << std::endl;
     return 0;
     }
-
-  vtkIGTLToMRMLBase::IGTLToMRML(buffer, node);
-
-  //------------------------------------------------------------
-  // Allocate TrackingData Message Class
-
-  igtl::TrackingDataMessage::Pointer trackingData;
-  trackingData = igtl::TrackingDataMessage::New();
-  trackingData->Copy(buffer); // !! TODO: copy makes performance issue.
-
-  int c = trackingData->Unpack(1);
-
-  if (c & igtl::MessageHeader::UNPACK_BODY) // if CRC check is OK
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InTrackingMetaMsg->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
+  vtkMRMLIGTLTrackingDataBundleNode* tBundleNode = vtkMRMLIGTLTrackingDataBundleNode::SafeDownCast(node);
+  if (tBundleNode)
     {
-    vtkMRMLIGTLTrackingDataBundleNode* tBundleNode = vtkMRMLIGTLTrackingDataBundleNode::SafeDownCast(node);
-    if (tBundleNode)
+    int nElements = this->InTrackingMetaMsg->GetNumberOfTrackingDataElement();
+    for (int i = 0; i < nElements; i ++)
       {
-      int nElements = trackingData->GetNumberOfTrackingDataElement();
-      for (int i = 0; i < nElements; i ++)
-        {
-        igtl::TrackingDataElement::Pointer trackingElement;
-        trackingData->GetTrackingDataElement(i, trackingElement);
+      igtl::TrackingDataElement::Pointer trackingElement;
+      this->InTrackingMetaMsg->GetTrackingDataElement(i, trackingElement);
 
-        igtl::Matrix4x4 matrix;
-        trackingElement->GetMatrix(matrix);
+      igtl::Matrix4x4 matrix;
+      trackingElement->GetMatrix(matrix);
 
-        tBundleNode->UpdateTransformNode(trackingElement->GetName(), matrix, trackingElement->GetType());
+      tBundleNode->UpdateTransformNode(trackingElement->GetName(), matrix, trackingElement->GetType());
 
-        std::cerr << "========== Element #" << i << " ==========" << std::endl;
-        std::cerr << " Name       : " << trackingElement->GetName() << std::endl;
-        std::cerr << " Type       : " << (int) trackingElement->GetType() << std::endl;
-        std::cerr << " Matrix : " << std::endl;
-        igtl::PrintMatrix(matrix);
-        std::cerr << "================================" << std::endl;
-        }
-      tBundleNode->Modified();
-      return 1;
+      std::cerr << "========== Element #" << i << " ==========" << std::endl;
+      std::cerr << " Name       : " << trackingElement->GetName() << std::endl;
+      std::cerr << " Type       : " << (int) trackingElement->GetType() << std::endl;
+      std::cerr << " Matrix : " << std::endl;
+      igtl::PrintMatrix(matrix);
+      std::cerr << "================================" << std::endl;
       }
+    tBundleNode->Modified();
+    return 1;
     }
   return 1;
 }
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLTrackingData::MRMLToIGTL(unsigned long vtkNotUsed(event), vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLTrackingData::MRMLToIGTL(unsigned long vtkNotUsed(event), vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (!mrmlNode)
     {
@@ -156,6 +148,8 @@ int vtkIGTLToMRMLTrackingData::MRMLToIGTL(unsigned long vtkNotUsed(event), vtkMR
           {
           this->StartTrackingDataMessage = igtl::StartTrackingDataMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->StartTrackingDataMessage->SetHeaderVersion(headerVersion);
         this->StartTrackingDataMessage->SetDeviceName(qnode->GetIGTLDeviceName());
         this->StartTrackingDataMessage->SetResolution(50);
         this->StartTrackingDataMessage->SetCoordinateName("");
@@ -170,6 +164,8 @@ int vtkIGTLToMRMLTrackingData::MRMLToIGTL(unsigned long vtkNotUsed(event), vtkMR
           {
           this->StopTrackingDataMessage = igtl::StopTrackingDataMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->StopTrackingDataMessage->SetHeaderVersion(headerVersion);
         this->StopTrackingDataMessage->SetDeviceName(qnode->GetIGTLDeviceName());
         this->StopTrackingDataMessage->Pack();
         *size = this->StopTrackingDataMessage->GetPackSize();

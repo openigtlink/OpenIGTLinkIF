@@ -31,19 +31,23 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLString : public v
 
   virtual int          GetConverterType() VTK_OVERRIDE { return TYPE_NORMAL; };
   virtual const char*  GetIGTLName() VTK_OVERRIDE { return "STRING"; };
-  virtual const char*  GetMRMLName() VTK_OVERRIDE { return "Text"; };
+  virtual std::vector<std::string>  GetAllMRMLNames() VTK_OVERRIDE
+  {
+    this->MRMLNames.clear();
+    this->MRMLNames.push_back("Text");
+    return this->MRMLNames;
+  }
   virtual vtkIntArray* GetNodeEvents() VTK_OVERRIDE;
-  virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name) VTK_OVERRIDE;
 
   // for TYPE_MULTI_IGTL_NAMES
   int                  GetNumberOfIGTLNames()   { return this->IGTLNames.size(); };
   const char*          GetIGTLName(int index)   { return this->IGTLNames[index].c_str(); };
 
   //BTX
-  virtual int          IGTLToMRML( igtl::MessageBase::Pointer buffer, vtkMRMLNode* node ) VTK_OVERRIDE;
+  virtual int          IGTLToMRML( vtkMRMLNode* node ) VTK_OVERRIDE;
   //ETX
-  virtual int          MRMLToIGTL( unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg ) VTK_OVERRIDE;
-
+  virtual int          MRMLToIGTL( unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2) VTK_OVERRIDE;
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer) VTK_OVERRIDE;
  
  protected:
   vtkIGTLToMRMLString();
@@ -51,6 +55,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLString : public v
 
  protected:
   //BTX
+  igtl::StringMessage::Pointer InStringMsg;
   igtl::StringMessage::Pointer StringMsg;
   //ETX
   

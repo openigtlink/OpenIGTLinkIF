@@ -24,9 +24,8 @@
 #include <vtkMRMLColorTableNode.h>
 
 // MRML includes
-#include <vtkMRMLScalarVolumeNode.h>
-#include <vtkMRMLScalarVolumeDisplayNode.h>
-#include <vtkMRMLVectorVolumeDisplayNode.h>
+#include <vtkMRMLModelNode.h>
+#include <vtkMRMLModelDisplayNode.h>
 
 // VTK includes
 #include <vtkPolyData.h>
@@ -55,6 +54,8 @@ vtkStandardNewMacro(vtkIGTLToMRMLPolyData);
 //---------------------------------------------------------------------------
 vtkIGTLToMRMLPolyData::vtkIGTLToMRMLPolyData()
 {
+  this->InPolyDataMessage = igtl::PolyDataMessage::New();
+  this->mrmlNodeTagName = "Model";
 }
 
 //---------------------------------------------------------------------------
@@ -70,48 +71,52 @@ void vtkIGTLToMRMLPolyData::PrintSelf(ostream& os, vtkIndent indent)
 
 
 //---------------------------------------------------------------------------
-vtkMRMLNode* vtkIGTLToMRMLPolyData::CreateNewNodeWithMessage(vtkMRMLScene* scene, const char* name, igtl::MessageBase::Pointer incomingPolyDataMessage)
+vtkMRMLNode* vtkIGTLToMRMLPolyData::CreateNewNode(vtkMRMLScene* scene, const char* name)
 {
-  igtl::MessageBase* innerPtr = incomingPolyDataMessage.GetPointer();
-  if( innerPtr == NULL )
-    {
-    vtkErrorMacro("Unable to create MRML node from incoming POLYDATA message: incoming PolyDataMessage is invalid");
-    return 0;
-    }
-
-
   // Create a node
-  vtkSmartPointer<vtkMRMLModelNode> modelNode = vtkSmartPointer<vtkMRMLModelNode>::New();
-  modelNode->SetName(name);
+  vtkMRMLNode* node = this->CreateMRMLNodeBaseOnTagName(scene);
+  if (node)
+    {
+    vtkSmartPointer<vtkMRMLModelNode> modelNode;
+    modelNode = vtkMRMLModelNode::SafeDownCast(node);
+    modelNode->SetName(name);
 
-  scene->SaveStateForUndo();
+    scene->SaveStateForUndo();
 
-  vtkDebugMacro("Setting scene info");
-  modelNode->SetScene(scene);
-  modelNode->SetDescription("Received by OpenIGTLink");
+    vtkDebugMacro("Setting scene info");
+    modelNode->SetScene(scene);
+    modelNode->SetDescription("Received by OpenIGTLink");
+    if(strcmp(node->GetNodeTagName(), "Model")==0)
+      {      
+      double color[3];
+      color[0] = 0.5;
+      color[1] = 0.5;
+      color[2] = 1.0;
+      // Display Node
+      vtkSmartPointer< vtkMRMLModelDisplayNode > displayNode = vtkSmartPointer< vtkMRMLModelDisplayNode >::New();
+      displayNode->SetColor(color);
+      displayNode->SetOpacity(1.0);
 
-  // Display Node
-  vtkSmartPointer< vtkMRMLModelDisplayNode > displayNode = vtkSmartPointer< vtkMRMLModelDisplayNode >::New();
+      displayNode->SliceIntersectionVisibilityOn();  
+      displayNode->VisibilityOn();
 
-  double color[3];
-  color[0] = 0.5;
-  color[1] = 0.5;
-  color[2] = 1.0;
-  displayNode->SetColor(color);
-  displayNode->SetOpacity(1.0);
+      scene->SaveStateForUndo();
+      scene->AddNode(modelNode);
+      scene->AddNode(displayNode);
 
-  displayNode->SliceIntersectionVisibilityOn();  
-  displayNode->VisibilityOn();
-
-  scene->SaveStateForUndo();
-  scene->AddNode(modelNode);
-  scene->AddNode(displayNode);
-
-  displayNode->SetScene(scene);
-  modelNode->SetAndObserveDisplayNodeID(displayNode->GetID());
-  modelNode->SetHideFromEditors(0);
+      displayNode->SetScene(scene);
+      modelNode->SetAndObserveDisplayNodeID(displayNode->GetID());
+      modelNode->SetHideFromEditors(0);
+      }
+    else
+      {
+      modelNode->CreateDefaultDisplayNodes();
+      }
+    scene->AddNode(modelNode);
+    return modelNode;
+    }
   
-  return modelNode;
+  return NULL;
 }
 
 
@@ -126,9 +131,38 @@ vtkIntArray* vtkIGTLToMRMLPolyData::GetNodeEvents()
   return events;
 }
 
+//---------------------------------------------------------------------------
+int vtkIGTLToMRMLPolyData::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
+{
+  if (message.IsNull())
+    {
+    // TODO: error handling
+    return 0;
+    }
+  this->InPolyDataMessage->Copy(message);
+  
+  // Deserialize the transform data
+  // If CheckCRC==0, CRC check is skipped.
+  int c = this->InPolyDataMessage->Unpack(this->CheckCRC);
+  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
+    {
+    // TODO: error handling
+    return 0;
+    }
+  this->mrmlNodeTagName = "";
+  if(this->InPolyDataMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_2)
+    {
+    this->InPolyDataMessage->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
+    }
+  else if(this->InPolyDataMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+    {
+    this->mrmlNodeTagName = "Model";
+    }
+  return 1;
+}
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node)
+int vtkIGTLToMRMLPolyData::IGTLToMRML(vtkMRMLNode* node)
 {
 
   vtkMRMLModelNode* modelNode = vtkMRMLModelNode::SafeDownCast(node);
@@ -138,23 +172,12 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     vtkErrorMacro("vtkIGTLToMRMLPolyData::IGTLToMRML failed: invalid node");
     return 0;
     }
-
-
-  // Create a message buffer to receive image data
-  igtl::PolyDataMessage::Pointer polyDataMsg;
-  polyDataMsg = igtl::PolyDataMessage::New();
-  polyDataMsg->Copy(buffer); // !! TODO: copy makes performance issue.
-
-  // Deserialize the data
-  // If CheckCRC==0, CRC check is skipped.
-  int c = polyDataMsg->Unpack(this->CheckCRC);
-
-  if ((c & igtl::MessageHeader::UNPACK_BODY) == 0) // if CRC check fails
-    {
-    vtkErrorMacro("Unable to create MRML node from incoming POLYDATA message. Failed to unpack the message");
-    return 0;
-    }
-
+  
+  igtlUint32 second;
+  igtlUint32 nanosecond;
+  this->InPolyDataMessage->GetTimeStamp(&second, &nanosecond);
+  this->SetNodeTimeStamp(second, nanosecond, node);
+  
   vtkSmartPointer<vtkPolyData> poly = vtkSmartPointer<vtkPolyData>::New();
 
   if (poly.GetPointer()==NULL)
@@ -163,7 +186,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Points
-  igtl::PolyDataPointArray::Pointer pointsArray = polyDataMsg->GetPoints();
+  igtl::PolyDataPointArray::Pointer pointsArray = this->InPolyDataMessage->GetPoints();
   int npoints = pointsArray->GetNumberOfPoints();
   if (npoints > 0)
     {
@@ -182,7 +205,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Vertices
-  igtl::PolyDataCellArray::Pointer verticesArray =  polyDataMsg->GetVertices();
+  igtl::PolyDataCellArray::Pointer verticesArray =  this->InPolyDataMessage->GetVertices();
   int nvertices = verticesArray.IsNotNull() ? verticesArray->GetNumberOfCells() : 0;
   if (nvertices > 0)
     {
@@ -205,7 +228,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Lines
-  igtl::PolyDataCellArray::Pointer linesArray = polyDataMsg->GetLines();
+  igtl::PolyDataCellArray::Pointer linesArray = this->InPolyDataMessage->GetLines();
   int nlines = linesArray.IsNotNull() ? linesArray->GetNumberOfCells() : 0;
   if (nlines > 0)
     {
@@ -230,7 +253,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Polygons
-  igtl::PolyDataCellArray::Pointer polygonsArray = polyDataMsg->GetPolygons();
+  igtl::PolyDataCellArray::Pointer polygonsArray = this->InPolyDataMessage->GetPolygons();
   int npolygons = polygonsArray.IsNotNull() ? polygonsArray->GetNumberOfCells() : 0;
   if (npolygons > 0)
     {
@@ -255,7 +278,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Triangle Strips
-  igtl::PolyDataCellArray::Pointer triangleStripsArray = polyDataMsg->GetTriangleStrips();
+  igtl::PolyDataCellArray::Pointer triangleStripsArray = this->InPolyDataMessage->GetTriangleStrips();
   int ntstrips = triangleStripsArray.IsNotNull() ? triangleStripsArray->GetNumberOfCells() : 0;
   if (ntstrips > 0)
     {
@@ -280,11 +303,11 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
     }
 
   // Attribute
-  int nAttributes = polyDataMsg->GetNumberOfAttributes();
+  int nAttributes = this->InPolyDataMessage->GetNumberOfAttributes();
   for (int i = 0; i < nAttributes; i ++)
     {
     igtl::PolyDataAttribute::Pointer attribute;    
-    attribute = polyDataMsg->GetAttribute(i);
+    attribute = this->InPolyDataMessage->GetAttribute(i);
 
     vtkSmartPointer<vtkFloatArray> data = 
       vtkSmartPointer<vtkFloatArray>::New();
@@ -352,7 +375,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRML
 
 
 //---------------------------------------------------------------------------
-int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg)
+int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2)
 {
   if (!mrmlNode)
     {
@@ -360,7 +383,7 @@ int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode
     }
 
   // If mrmlNode is PolyData node
-  if (event == vtkMRMLModelNode::PolyDataModifiedEvent && strcmp(mrmlNode->GetNodeTagName(), "Model") == 0)
+  if (event == vtkMRMLModelNode::PolyDataModifiedEvent && this->CheckIfMRMLSupported(mrmlNode->GetNodeTagName()))
     {
     vtkMRMLModelNode* modelNode =
       vtkMRMLModelNode::SafeDownCast(mrmlNode);
@@ -388,7 +411,9 @@ int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode
       {
       this->OutPolyDataMessage->Clear();
       }
-    
+    unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+    this->OutPolyDataMessage->SetHeaderVersion(headerVersion);
+    this->OutPolyDataMessage->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, mrmlNode->GetNodeTagName());
     // Set message name -- use the same name as the MRML node 
     this->OutPolyDataMessage->SetDeviceName(modelNode->GetName());
 
@@ -505,6 +530,8 @@ int vtkIGTLToMRMLPolyData::MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode
           {
           this->GetPolyDataMessage = igtl::GetPolyDataMessage::New();
           }
+        unsigned short headerVersion = useProtocolV2?IGTL_HEADER_VERSION_2:IGTL_HEADER_VERSION_1;
+        this->GetPolyDataMessage->SetHeaderVersion(headerVersion);
         this->GetPolyDataMessage->SetDeviceName(qnode->GetIGTLDeviceName());
         this->GetPolyDataMessage->Pack();
         *size = this->GetPolyDataMessage->GetPackSize();

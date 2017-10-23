@@ -41,15 +41,21 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLLinearTransform :
   void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
 
   virtual const char*  GetIGTLName() VTK_OVERRIDE { return "TRANSFORM"; };
-  virtual const char*  GetMRMLName() VTK_OVERRIDE { return "LinearTransform"; };
+  virtual std::vector<std::string>  GetAllMRMLNames() VTK_OVERRIDE
+  {
+    this->MRMLNames.clear();
+    this->MRMLNames.push_back("LinearTransform");
+    return this->MRMLNames;
+  }
   virtual vtkIntArray* GetNodeEvents() VTK_OVERRIDE;
   virtual vtkMRMLNode* CreateNewNode(vtkMRMLScene* scene, const char* name) VTK_OVERRIDE;
 
-  virtual int          IGTLToMRML(igtl::MessageBase::Pointer buffer, vtkMRMLNode* node) VTK_OVERRIDE;
-  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg) VTK_OVERRIDE;
+  virtual int          IGTLToMRML(vtkMRMLNode* node) VTK_OVERRIDE;
+  virtual int          MRMLToIGTL(unsigned long event, vtkMRMLNode* mrmlNode, int* size, void** igtlMsg, bool useProtocolV2) VTK_OVERRIDE;
 
   virtual int IsVisible() VTK_OVERRIDE { return 1; };
   virtual void SetVisibility(int sw, vtkMRMLScene * scene, vtkMRMLNode * node) VTK_OVERRIDE;
+  virtual int          UnpackIGTLMessage(igtl::MessageBase::Pointer buffer) VTK_OVERRIDE;
 
  protected:
   vtkIGTLToMRMLLinearTransform();
@@ -59,6 +65,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkIGTLToMRMLLinearTransform :
   vtkMRMLModelNode* AddLocatorModel(vtkMRMLScene * scene, const char* nodeName, double r, double g, double b);
 
  protected:
+  igtl::TransformMessage::Pointer InTransformMsg;
   igtl::TransformMessage::Pointer OutTransformMsg;
 
 };
