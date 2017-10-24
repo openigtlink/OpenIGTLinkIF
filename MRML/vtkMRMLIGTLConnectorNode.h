@@ -173,6 +173,8 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   ~vtkMRMLIGTLConnectorNode();
   vtkMRMLIGTLConnectorNode(const vtkMRMLIGTLConnectorNode&);
   void operator=(const vtkMRMLIGTLConnectorNode&);
+
+  int AssignNodeToDevice(vtkMRMLNode* node, igtlio::DevicePointer device);
   
   //----------------------------------------------------------------
   // Reference role strings
