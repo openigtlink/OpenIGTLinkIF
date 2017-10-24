@@ -316,7 +316,7 @@ int vtkIGTLToMRMLPolyData::IGTLToMRML(vtkMRMLNode* node)
   for (int i = 0; i < nAttributes; i ++)
     {
     igtl::PolyDataAttribute::Pointer attribute;    
-    attribute = this->InPolyDataMessage->GetAttribute(i);
+    attribute = this->InPolyDataMessage->GetAttribute(igtl::PolyDataMessage::AttributeList::size_type(i));
 
     vtkSmartPointer<vtkFloatArray> data = 
       vtkSmartPointer<vtkFloatArray>::New();
