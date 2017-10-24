@@ -139,8 +139,17 @@ int vtkIGTLToMRMLImage::UnpackIGTLMessage(igtl::MessageBase::Pointer message)
     {
     this->InImageMessage->GetMetaDataElement(MEMLNodeNameKey, this->mrmlNodeTagName);
     }
-  else if(this->InImageMessage->GetHeaderVersion()==IGTL_HEADER_VERSION_1)
+  if(!(this->mrmlNodeTagName.compare("")==0))
     {
+    // The user specified mrmlnode is not supported by the converter.
+    if(!this->CheckIfMRMLSupported(this->mrmlNodeTagName.c_str()))
+      {
+      return 0;
+      }
+    }
+  else
+    {
+    //The message is version1 or version 2 without meta information.
     int numberOfComponents=this->InImageMessage->GetNumComponents();
     if (numberOfComponents == 1)
       {
