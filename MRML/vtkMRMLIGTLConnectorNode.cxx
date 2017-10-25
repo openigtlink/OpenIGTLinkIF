@@ -896,26 +896,42 @@ int vtkMRMLIGTLConnectorNode::RegisterOutgoingMRMLNode(vtkMRMLNode* node, const 
     }
   }
   
-  this->AddAndObserveNodeReferenceID(this->GetOutgoingNodeReferenceRole(), node->GetID());
-  
-  igtlio::DeviceKeyType key;
-  key.name = node->GetName();
-  key.type = GetDeviceTypeFromMRMLNodeType(node->GetNodeTagName());
-  
-  igtlio::DevicePointer device = this->IOConnector->GetDevice(key);
-  
-  if (!device)
-  {
-    device = this->IOConnector->GetDeviceFactory()->create(key.type, key.name);
-    device->SetMessageDirection(igtlio::Device::MESSAGE_DIRECTION_OUT);
-    this->IOConnector->AddDevice(device);
-  }
-  
-  this->MRMLNameToDeviceMap[node->GetName()] = device;
-  
-  this->Modified();
-  
-  return 1;
+  if (this->AddAndObserveNodeReferenceID(this->GetOutgoingNodeReferenceRole(), node->GetID()))
+    {
+    igtlio::DeviceKeyType key;
+    key.name = node->GetName();
+    key.type = GetDeviceTypeFromMRMLNodeType(node->GetNodeTagName());
+    
+    igtlio::DevicePointer device = this->IOConnector->GetDevice(key);
+    
+    if (!device)
+    {
+      device = this->IOConnector->GetDeviceFactory()->create(key.type, key.name);
+      device->SetMessageDirection(igtlio::Device::MESSAGE_DIRECTION_OUT);
+      this->IOConnector->AddDevice(device);
+    }
+    
+    this->MRMLNameToDeviceMap[node->GetName()] = device;
+    
+    this->Modified();
+    
+    return 1;
+    }
+  else // If the reference node wasn't associated with any device, delete the reference
+    {
+    int n = this->GetNumberOfNodeReferences(this->GetOutgoingNodeReferenceRole());
+    for (int i = 0; i < n; i ++)
+    {
+      const char* id = GetNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
+      if (strcmp(node->GetID(), id) == 0)
+      {
+        // Alredy on the list. Remove it.
+        this->RemoveNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
+        break;
+      }
+    }
+    return 0;
+    }
   
 }
 

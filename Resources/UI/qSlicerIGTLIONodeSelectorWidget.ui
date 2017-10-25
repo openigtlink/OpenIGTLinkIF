@@ -37,8 +37,7 @@
      <property name="nodeTypes">
       <stringlist>
        <string>vtkMRMLLinearTransformNode</string>
-       <string>vtkMRMLScalarVolumeNode</string>
-       <string>vtkMRMLMarkupsFiducialNode</string>
+       <string>vtkMRMLVolumeNode</string>
        <string>vtkMRMLModelNode</string>
        <string>vtkMRMLTextNode</string>
       </stringlist>
