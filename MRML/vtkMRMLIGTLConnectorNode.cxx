@@ -70,10 +70,14 @@ vtkMRMLIGTLConnectorNode::vtkMRMLIGTLConnectorNode()
   this->AddNodeReferenceRole(this->GetOutgoingNodeReferenceRole(),
                              this->GetOutgoingNodeReferenceMRMLAttributeName());
   
-  //IOConnectorCallback = vtkSmartPointer<vtkCallbackCommand>::New();
-  //IOConnectorCallback->SetCallback(&this->ProcessVTKObjectEvents);
-  //IOConnectorCallback->SetClientData(this);
-
+  this->DeviceTypeToNodeTagMap.clear();
+  std::string volumeTags[] = {"VectorVolume", "Volume"};
+  this->DeviceTypeToNodeTagMap["IMAGE"] = std::vector<std::string>(volumeTags, volumeTags+2);
+  this->DeviceTypeToNodeTagMap["STATUS"] = std::vector<std::string>(1,"IGTLStatus");
+  this->DeviceTypeToNodeTagMap["TRANSFORM"] = std::vector<std::string>(1,"LinearTransform");
+  std::string modelTags[] = {"Model", "FiberBundle"};
+  this->DeviceTypeToNodeTagMap["POLYDATA"] = std::vector<std::string>(modelTags, modelTags+2);
+  this->DeviceTypeToNodeTagMap["STRING"] = std::vector<std::string>(1,"Text");
 }
 
 //----------------------------------------------------------------------------
@@ -83,16 +87,335 @@ vtkMRMLIGTLConnectorNode::~vtkMRMLIGTLConnectorNode()
 
 void vtkMRMLIGTLConnectorNode::ConnectEvents()
 {
-  IOConnector->AddObserver(IOConnector->ConnectedEvent, this, &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
-  IOConnector->AddObserver(IOConnector->DisconnectedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
-  IOConnector->AddObserver(IOConnector->ActivatedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
-  IOConnector->AddObserver(IOConnector->DeactivatedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
-  this->NewDeviceEventObeserverTag = IOConnector->AddObserver(IOConnector->NewDeviceEvent, this,  &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
-  //IOConnector->AddObserver(IOConnector->DeviceModifiedEvent,this, &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
-  IOConnector->AddObserver(IOConnector->RemovedDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
+  IOConnector->AddObserver(IOConnector->ConnectedEvent, this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+  IOConnector->AddObserver(IOConnector->DisconnectedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+  IOConnector->AddObserver(IOConnector->ActivatedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+  IOConnector->AddObserver(IOConnector->DeactivatedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+  this->NewDeviceEventObeserverTag = IOConnector->AddObserver(IOConnector->NewDeviceEvent, this,  &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+  IOConnector->AddObserver(IOConnector->DeviceModifiedEvent,this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+  IOConnector->AddObserver(IOConnector->RemovedDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
 }
 
-void vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents( vtkObject *caller, unsigned long event, void *callData )
+
+std::vector<std::string> vtkMRMLIGTLConnectorNode::GetNodeTagFromDeviceType(const char * deviceType)
+{
+  DeviceTypeToNodeTagMapType::iterator iter;
+  if(this->DeviceTypeToNodeTagMap.find(std::string(deviceType)) != this->DeviceTypeToNodeTagMap.end())
+    {
+    return this->DeviceTypeToNodeTagMap.find(std::string(deviceType))->second;
+    }
+  return std::vector<std::string>(0);
+}
+
+std::string vtkMRMLIGTLConnectorNode::GetDeviceTypeFromMRMLNodeType(const char* NodeTag)
+{
+  if(strcmp(NodeTag, "Volume")==0 || strcmp(NodeTag, "VectorVolume")==0)
+  {
+    return std::string("IMAGE");
+  }
+  if(strcmp(NodeTag, "IGTLStatus")==0)
+  {
+    return std::string("STATUS");
+  }
+  if(strcmp(NodeTag, "LinearTransform")==0)
+  {
+    return std::string("TRANSFORM");
+  }
+  if(strcmp(NodeTag, "Model")==0)
+  {
+    return std::string("POLYDATA");
+  }
+  if(strcmp(NodeTag, "FiberBundle")==0)
+  {
+    return std::string("POLYDATA");
+  }
+  if(strcmp(NodeTag, "Text")==0)
+  {
+    return std::string("STRING");
+  }
+  return std::string(0);
+}
+
+vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOrAddMRMLNodeforDevice(igtlio::Device* device)
+{
+  if(device)
+    {
+    if(device->GetMessageDirection() != igtlio::Device::MESSAGE_DIRECTION_IN)
+      {
+      // we are only interested in incomming devices
+      return NULL;
+      }
+    }
+  // Found the node and return the node;
+  NodeInfoMapType::iterator inIter;
+  for (inIter = this->IncomingMRMLNodeInfoMap.begin();
+       inIter != this->IncomingMRMLNodeInfoMap.end();
+       inIter ++)
+    {
+    vtkMRMLNode* node = this->GetScene()->GetNodeByID((inIter->first));
+    if(node)
+      {
+      const char * deviceType = device->GetDeviceType().c_str();
+      const char * deviceName = device->GetDeviceName().c_str();
+      bool typeMatched = false;
+      for (unsigned int i = 0; i < this->GetNodeTagFromDeviceType(deviceType).size(); i++)
+        {
+        const char* nodeTage = this->GetNodeTagFromDeviceType(deviceType)[i].c_str();
+        if (strcmp(node->GetNodeTagName(), nodeTage) == 0)
+          {
+          typeMatched = 1;
+          break;
+          }
+        }
+      if (typeMatched && strcmp(node->GetName(), deviceName) == 0)
+        {
+        return node;
+        }
+      }
+    }
+  
+  // Node not found and add the node
+  if(strcmp(device->GetDeviceType().c_str(), "IMAGE")==0)
+    {
+    igtlio::ImageDevice* imageDevice = reinterpret_cast<igtlio::ImageDevice*>(device);
+    igtlio::ImageConverter::ContentData content = imageDevice->GetContent();
+    vtkSmartPointer<vtkMRMLVolumeNode> volumeNode;
+    int numberOfComponents = 1; //to improve the io module to be able to cope with video data
+    if (numberOfComponents == 1)
+      {
+      volumeNode = vtkSmartPointer<vtkMRMLScalarVolumeNode>::New();
+      }
+    else if (numberOfComponents > 1)
+      {
+      volumeNode = vtkSmartPointer<vtkMRMLVectorVolumeNode>::New();
+      }
+    volumeNode->SetAndObserveImageData(content.image);
+    volumeNode->SetName(imageDevice->GetDeviceName().c_str());
+    
+    Scene->SaveStateForUndo();
+    
+    vtkDebugMacro("Setting scene info");
+    volumeNode->SetScene(this->GetScene());
+    volumeNode->SetDescription("Received by OpenIGTLink");
+    
+    ///double range[2];
+    vtkDebugMacro("Set basic display info");
+    
+    vtkDebugMacro("Name vol node "<<volumeNode->GetClassName());
+    this->GetScene()->AddNode(volumeNode);
+    bool scalarDisplayNodeRequired = (numberOfComponents==1);
+    vtkSmartPointer<vtkMRMLVolumeDisplayNode> displayNode;
+    if (scalarDisplayNodeRequired)
+      {
+      displayNode = vtkSmartPointer<vtkMRMLScalarVolumeDisplayNode>::New();
+      }
+    else
+      {
+      displayNode = vtkSmartPointer<vtkMRMLVectorVolumeDisplayNode>::New();
+      }
+    
+    this->GetScene()->AddNode(displayNode);
+    
+    if (scalarDisplayNodeRequired)
+      {
+      const char* colorTableId = vtkMRMLColorLogic::GetColorTableNodeID(vtkMRMLColorTableNode::Grey);
+      displayNode->SetAndObserveColorNodeID(colorTableId);
+      }
+    else
+      {
+      displayNode->SetDefaultColorMap();
+      }
+    
+    volumeNode->SetAndObserveDisplayNodeID(displayNode->GetID());
+    this->RegisterIncomingMRMLNode(volumeNode);
+    return volumeNode;
+    }
+  else if(strcmp(device->GetDeviceType().c_str(),"STATUS")==0)
+    {
+    vtkMRMLIGTLStatusNode* statusNode;
+    statusNode = vtkMRMLIGTLStatusNode::New();
+    statusNode->SetName(device->GetDeviceName().c_str());
+    statusNode->SetDescription("Received by OpenIGTLink");
+    this->GetScene()->AddNode(statusNode);
+    this->RegisterIncomingMRMLNode(statusNode);
+    return statusNode;
+    }
+  else if(strcmp(device->GetDeviceType().c_str(),"TRANSFORM")==0)
+    {
+    vtkMRMLLinearTransformNode* transformNode;
+    transformNode = vtkMRMLLinearTransformNode::New();
+    transformNode->SetName(device->GetDeviceName().c_str());
+    transformNode->SetDescription("Received by OpenIGTLink");
+    
+    vtkMatrix4x4* transform = vtkMatrix4x4::New();
+    transform->Identity();
+    transformNode->ApplyTransformMatrix(transform);
+    transform->Delete();
+    this->GetScene()->AddNode(transformNode);
+    this->RegisterIncomingMRMLNode(transformNode);
+    return transformNode;
+    }
+  else if(strcmp(device->GetDeviceType().c_str(),"POLYDATA")==0)
+    {
+    igtlio::PolyDataDevice* polyDevice = reinterpret_cast<igtlio::PolyDataDevice*>(device);
+    igtlio::PolyDataConverter::ContentData content = polyDevice->GetContent();
+    
+    std::string mrmlNodeTagName = "";
+    igtl::MessageBase::MetaDataMap metaInfo = device->GetMetaData();
+    vtkMRMLModelNode* modelNode = NULL;
+    if (metaInfo.size())
+      {
+      if(metaInfo.find(MEMLNodeNameKey) != metaInfo.end())
+        {
+        mrmlNodeTagName = metaInfo.find(MEMLNodeNameKey)->second.second;
+        }
+      }
+    if(!(mrmlNodeTagName.compare("")==0))
+      {
+      std::string className = this->GetScene()->GetClassNameByTag(mrmlNodeTagName.c_str());
+      vtkMRMLNode * createdNode = this->GetScene()->CreateNodeByClass(className.c_str());
+      if (createdNode)
+        {
+        modelNode = vtkMRMLModelNode::SafeDownCast(createdNode);
+        }
+      else
+        {
+        modelNode = vtkMRMLModelNode::New();
+        }
+      }
+    else
+      {
+      modelNode = vtkMRMLModelNode::New();
+      }
+      modelNode->SetName(device->GetDeviceName().c_str());
+      modelNode->SetDescription("Received by OpenIGTLink");
+      this->GetScene()->AddNode(modelNode);
+      modelNode->SetAndObservePolyData(content.polydata);
+      modelNode->CreateDefaultDisplayNodes();
+      this->RegisterIncomingMRMLNode(modelNode);
+      return modelNode;
+    }
+  else if (strcmp(device->GetDeviceType().c_str(),"STRING")==0)
+    {
+      igtlio::StringDevice* modifiedDevice = reinterpret_cast<igtlio::StringDevice*>(device);
+      vtkMRMLTextNode* textNode =  vtkMRMLTextNode::New();
+      textNode->SetEncoding(modifiedDevice->GetContent().encoding);
+      textNode->SetText(modifiedDevice->GetContent().string_msg.c_str());
+      textNode->SetName(device->GetDeviceName().c_str());
+      this->RegisterIncomingMRMLNode(textNode);
+      return textNode;
+    }
+  return NULL;
+}
+
+void vtkMRMLIGTLConnectorNode::ProcessNewDeviceEvent(vtkObject *caller, unsigned long event, void *callData )
+{
+}
+
+void vtkMRMLIGTLConnectorNode::ProcessIncomingDeviceModifiedEvent(vtkObject *caller, unsigned long event, void *callData)
+{
+  igtlio::Device* modifiedDevice = reinterpret_cast<igtlio::Device*>(callData);
+  vtkMRMLNode* modifiedNode = this->GetOrAddMRMLNodeforDevice(modifiedDevice);
+  const char * deviceType = modifiedDevice->GetDeviceType().c_str();
+  const char * deviceName = modifiedDevice->GetDeviceName().c_str();
+  if (modifiedNode && modifiedDevice->MessageDirectionIsIn())
+    {
+    if (strcmp(deviceType, "IMAGE")==0)
+      {
+      igtlio::ImageDevice* imageDevice = reinterpret_cast<igtlio::ImageDevice*>(modifiedDevice);
+      if (strcmp(modifiedNode->GetNodeTagName(), "Volume") == 0 &&
+          strcmp(modifiedNode->GetName(), deviceName) == 0)
+        {
+        vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(modifiedNode);
+        volumeNode->SetIJKToRASMatrix(imageDevice->GetContent().transform);
+        volumeNode->SetAndObserveImageData(imageDevice->GetContent().image);
+        volumeNode->Modified();
+        volumeNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
+        }
+      }
+    else if (strcmp(deviceType,"STATUS")==0)
+      {
+      igtlio::StatusDevice* statusDevice = reinterpret_cast<igtlio::StatusDevice*>(modifiedDevice);
+      if (strcmp(modifiedNode->GetNodeTagName(), "IGTLStatus") == 0 &&
+          strcmp(modifiedNode->GetName(), deviceName) == 0)
+        {
+        vtkMRMLIGTLStatusNode* statusNode = vtkMRMLIGTLStatusNode::SafeDownCast(modifiedNode);
+        statusNode->SetStatus(statusDevice->GetContent().code, statusDevice->GetContent().subcode, statusDevice->GetContent().errorname.c_str(), statusDevice->GetContent().statusstring.c_str());
+        statusNode->Modified();
+        statusNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
+        }
+      }
+    else if (strcmp(deviceType,"TRANSFORM")==0)
+      {
+      igtlio::TransformDevice* transformDevice = reinterpret_cast<igtlio::TransformDevice*>(modifiedDevice);
+      if (strcmp(modifiedNode->GetNodeTagName(), "LinearTransform") == 0 &&
+          strcmp(modifiedNode->GetName(), deviceName) == 0)
+        {
+        vtkMRMLLinearTransformNode* transformNode = vtkMRMLLinearTransformNode::SafeDownCast(modifiedNode);
+        vtkSmartPointer<vtkMatrix4x4> transfromMatrix = vtkMatrix4x4::New();
+        transfromMatrix->DeepCopy(transformDevice->GetContent().transform);
+        transformNode->SetMatrixTransformToParent(transfromMatrix.GetPointer());
+        transformNode->Modified();
+        transformNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
+        }
+      }
+    else if (strcmp(deviceType,"POLYDATA")==0)
+      {
+      igtlio::PolyDataDevice* polyDevice = reinterpret_cast<igtlio::PolyDataDevice*>(modifiedDevice);
+      if (strcmp(modifiedNode->GetNodeTagName(), "Model") == 0 &&
+          strcmp(modifiedNode->GetName(), deviceName) == 0)
+        {
+        vtkMRMLModelNode* modelNode = vtkMRMLModelNode::SafeDownCast(modifiedNode);
+        modelNode->SetAndObservePolyData(polyDevice->GetContent().polydata);
+        modelNode->Modified();
+        modelNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
+        }
+      }
+    else if (strcmp(deviceType,"STRING")==0)
+      {
+      igtlio::StringDevice* stringDevice = reinterpret_cast<igtlio::StringDevice*>(modifiedDevice);
+      if (strcmp(modifiedNode->GetNodeTagName(), "Text") == 0 &&
+          strcmp(modifiedNode->GetName(), deviceName) == 0)
+        {
+        vtkMRMLTextNode* textNode = vtkMRMLTextNode::SafeDownCast(modifiedNode);
+        textNode->SetEncoding(stringDevice->GetContent().encoding);
+        textNode->SetText(stringDevice->GetContent().string_msg.c_str());
+        textNode->Modified();
+        textNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
+        }
+      }
+    else if (strcmp(deviceType,"COMMAND")==0)
+      {
+      // Process the modified event from command device.
+      }
+    }
+}
+
+
+//----------------------------------------------------------------------------
+void vtkMRMLIGTLConnectorNode::ProcessMRMLEvents( vtkObject *caller, unsigned long event, void *callData )
+{
+  Superclass::ProcessMRMLEvents(caller, event, callData);
+  vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(caller);
+  if (!node)
+    {
+    return;
+    }
+
+  int n = this->GetNumberOfNodeReferences(this->GetOutgoingNodeReferenceRole());
+
+  for (int i = 0; i < n; i ++)
+  {
+    const char* id = GetNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
+    if (strcmp(node->GetID(), id) == 0)
+    {
+      this->PushNode(node, event);
+    }
+  }
+}
+
+
+void vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents(vtkObject *caller, unsigned long event, void *callData )
 {
   this->vtkMRMLNode::ProcessMRMLEvents( caller, event, callData );
   igtlio::Connector* connector = reinterpret_cast<igtlio::Connector*>(caller);
@@ -103,242 +426,14 @@ void vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents( vtkObject *caller
     }
   if(event==IOConnector->NewDeviceEvent)
     {
-    igtlio::Device* device = reinterpret_cast<igtlio::Device*>(callData);
-    if(device)
-      {
-      if(device->GetMessageDirection() != igtlio::Device::MESSAGE_DIRECTION_IN)
-        {
-        // we are only interested in incomming devices
-        return;
-        }
-      }
-    igtlio::Device* addedDevice = reinterpret_cast<igtlio::Device*>(callData);
-    if(strcmp(addedDevice->GetDeviceType().c_str(),"IMAGE")==0)
-      {
-      igtlio::ImageDevice* addedDevice = reinterpret_cast<igtlio::ImageDevice*>(callData);
-      igtlio::ImageConverter::ContentData content = addedDevice->GetContent();
-      vtkSmartPointer<vtkMRMLVolumeNode> volumeNode;
-      int numberOfComponents = 1; //to improve the io module to be able to cope with video data
-      if (numberOfComponents == 1)
-        {
-        volumeNode = vtkSmartPointer<vtkMRMLScalarVolumeNode>::New();
-        }
-      else if (numberOfComponents > 1)
-        {
-        volumeNode = vtkSmartPointer<vtkMRMLVectorVolumeNode>::New();
-        }
-      volumeNode->SetAndObserveImageData(content.image);
-      volumeNode->SetName(addedDevice->GetDeviceName().c_str());
-      
-      Scene->SaveStateForUndo();
-      
-      vtkDebugMacro("Setting scene info");
-      volumeNode->SetScene(this->GetScene());
-      volumeNode->SetDescription("Received by OpenIGTLink");
-      
-      ///double range[2];
-      vtkDebugMacro("Set basic display info");
-      
-      vtkDebugMacro("Name vol node "<<volumeNode->GetClassName());
-      this->GetScene()->AddNode(volumeNode);
-      bool scalarDisplayNodeRequired = (numberOfComponents==1);
-      vtkSmartPointer<vtkMRMLVolumeDisplayNode> displayNode;
-      if (scalarDisplayNodeRequired)
-        {
-        displayNode = vtkSmartPointer<vtkMRMLScalarVolumeDisplayNode>::New();
-        }
-      else
-        {
-        displayNode = vtkSmartPointer<vtkMRMLVectorVolumeDisplayNode>::New();
-        }
-      
-      this->GetScene()->AddNode(displayNode);
-      
-      if (scalarDisplayNodeRequired)
-        {
-        const char* colorTableId = vtkMRMLColorLogic::GetColorTableNodeID(vtkMRMLColorTableNode::Grey);
-        displayNode->SetAndObserveColorNodeID(colorTableId);
-        }
-      else
-        {
-        displayNode->SetDefaultColorMap();
-        }
-      
-      volumeNode->SetAndObserveDisplayNodeID(displayNode->GetID());
-      this->RegisterIncomingMRMLNode(volumeNode);
-      }
-    else if(strcmp(addedDevice->GetDeviceType().c_str(),"STATUS")==0)
-      {
-      vtkMRMLIGTLStatusNode* statusNode;
-      statusNode = vtkMRMLIGTLStatusNode::New();
-      statusNode->SetName(addedDevice->GetDeviceName().c_str());
-      statusNode->SetDescription("Received by OpenIGTLink");
-      this->GetScene()->AddNode(statusNode);
-      this->RegisterIncomingMRMLNode(statusNode);
-      statusNode->Delete();
-      }
-    else if(strcmp(addedDevice->GetDeviceType().c_str(),"TRANSFORM")==0)
-      {
-      vtkMRMLLinearTransformNode* transformNode;
-      transformNode = vtkMRMLLinearTransformNode::New();
-      transformNode->SetName(addedDevice->GetDeviceName().c_str());
-      transformNode->SetDescription("Received by OpenIGTLink");
-      
-      vtkMatrix4x4* transform = vtkMatrix4x4::New();
-      transform->Identity();
-      transformNode->ApplyTransformMatrix(transform);
-      transform->Delete();
-      this->GetScene()->AddNode(transformNode);
-      this->RegisterIncomingMRMLNode(transformNode);
-      transformNode->Delete();
-      }
-    else if(strcmp(addedDevice->GetDeviceType().c_str(),"POLYDATA")==0)
-      {
-      igtlio::PolyDataDevice* addedDevice = reinterpret_cast<igtlio::PolyDataDevice*>(callData);
-      igtlio::PolyDataConverter::ContentData content = addedDevice->GetContent();
-      
-      std::string mrmlNodeTagName = "";
-      igtl::MessageBase::MetaDataMap metaInfo = addedDevice->GetMetaData();
-      vtkMRMLModelNode* node = NULL;
-      if (metaInfo.size())
-        {
-        if(metaInfo.find(MEMLNodeNameKey) != metaInfo.end())
-          {
-          mrmlNodeTagName = metaInfo.find(MEMLNodeNameKey)->second.second;
-          }
-        }
-      if(!(mrmlNodeTagName.compare("")==0))
-        {
-        std::string className = this->GetScene()->GetClassNameByTag(mrmlNodeTagName.c_str());
-        vtkMRMLNode * createdNode = this->GetScene()->CreateNodeByClass(className.c_str());
-        if (createdNode)
-          {
-          node = vtkMRMLModelNode::SafeDownCast(createdNode);
-          }
-        else
-          {
-          node = vtkMRMLModelNode::New();
-          }
-        }
-      else
-        {
-        node = vtkMRMLModelNode::New();
-        }
-        node->SetName(addedDevice->GetDeviceName().c_str());
-        node->SetDescription("Received by OpenIGTLink");
-        this->GetScene()->AddNode(node);
-        node->SetAndObservePolyData(content.polydata);
-        node->CreateDefaultDisplayNodes();
-        this->RegisterIncomingMRMLNode(node);
-        node->Delete();
-      }
-    else if (strcmp(addedDevice->GetDeviceType().c_str(),"STRING")==0)
-      {
-        igtlio::StringDevice* modifiedDevice = reinterpret_cast<igtlio::StringDevice*>(caller);
-        vtkMRMLTextNode* textNode =  vtkMRMLTextNode::New();
-        textNode->SetEncoding(modifiedDevice->GetContent().encoding);
-        textNode->SetText(modifiedDevice->GetContent().string_msg.c_str());
-        this->RegisterIncomingMRMLNode(textNode);
-        textNode->Delete();
-      }
-    addedDevice->AddObserver(vtkCommand::ModifiedEvent, this, &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
+    // no action perform at this stage, wait until the message content in the device is unpacked,
+    // As we need the message content data to create mrmlnode.
+    this->ProcessNewDeviceEvent(caller, event, callData );
     }
-  if(event==vtkCommand::ModifiedEvent)
+  if(event==IOConnector->DeviceModifiedEvent)
     {
-    NodeInfoMapType::iterator inIter;
-    for (inIter = this->IncomingMRMLNodeInfoMap.begin();
-         inIter != this->IncomingMRMLNodeInfoMap.end();
-         inIter ++)
-      {
-      vtkMRMLNode* node = this->GetScene()->GetNodeByID((inIter->first));
-      igtlio::Device* modifiedDevice = reinterpret_cast<igtlio::Device*>(caller);
-      const char * deviceType = modifiedDevice->GetDeviceType().c_str();
-      const char * deviceName = modifiedDevice->GetDeviceName().c_str();
-      if (strcmp(deviceType,"IMAGE")==0)
-        {
-        igtlio::ImageDevice* imageDevice = reinterpret_cast<igtlio::ImageDevice*>(caller);
-        if (node &&
-            strcmp(node->GetNodeTagName(), "Volume") == 0 &&
-            strcmp(node->GetName(), deviceName) == 0)
-          {
-          vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(node);
-          volumeNode->SetIJKToRASMatrix(imageDevice->GetContent().transform);
-          volumeNode->SetAndObserveImageData(imageDevice->GetContent().image);
-          volumeNode->Modified();
-          volumeNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
-          break;
-          }
-        }
-      else if (strcmp(deviceType,"STATUS")==0)
-        {
-        igtlio::StatusDevice* statusDevice = reinterpret_cast<igtlio::StatusDevice*>(caller);
-        if (node &&
-            strcmp(node->GetNodeTagName(), "IGTLStatus") == 0 &&
-            strcmp(node->GetName(), deviceName) == 0)
-          {
-          vtkMRMLIGTLStatusNode* statusNode = vtkMRMLIGTLStatusNode::SafeDownCast(node);
-          statusNode->SetStatus(statusDevice->GetContent().code, statusDevice->GetContent().subcode, statusDevice->GetContent().errorname.c_str(), statusDevice->GetContent().statusstring.c_str());
-          statusNode->Modified();
-          statusNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
-          break;
-          }
-        }
-      else if (strcmp(deviceType,"TRANSFORM")==0)
-        {
-        igtlio::TransformDevice* transformDevice = reinterpret_cast<igtlio::TransformDevice*>(caller);
-        if (node &&
-            strcmp(node->GetNodeTagName(), "LinearTransform") == 0 &&
-            strcmp(node->GetName(), deviceName) == 0)
-          {
-          vtkMRMLLinearTransformNode* transformNode = vtkMRMLLinearTransformNode::SafeDownCast(node);
-          vtkSmartPointer<vtkMatrix4x4> transfromMatrix = vtkMatrix4x4::New();
-          transfromMatrix->DeepCopy(transformDevice->GetContent().transform);
-          transformNode->SetMatrixTransformToParent(transfromMatrix.GetPointer());
-          transformNode->Modified();
-          transformNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
-          break;
-          }
-        }
-      else if (strcmp(deviceType,"POLYDATA")==0)
-        {
-        igtlio::PolyDataDevice* modifiedDevice = reinterpret_cast<igtlio::PolyDataDevice*>(caller);
-        if (node &&
-            strcmp(node->GetNodeTagName(), "Model") == 0 &&
-            strcmp(node->GetName(), deviceName) == 0)
-          {
-          vtkMRMLModelNode* modelNode = vtkMRMLModelNode::SafeDownCast(node);
-          modelNode->SetAndObservePolyData(modifiedDevice->GetContent().polydata);
-          modelNode->Modified();
-          modelNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
-          break;
-          }
-        }
-      else if (strcmp(deviceType,"STRING")==0)
-        {
-        igtlio::StringDevice* modifiedDevice = reinterpret_cast<igtlio::StringDevice*>(caller);
-        if (node &&
-            strcmp(node->GetNodeTagName(), "Text") == 0 &&
-            strcmp(node->GetName(), deviceName) == 0)
-          {
-          vtkMRMLTextNode* textNode = vtkMRMLTextNode::SafeDownCast(node);
-          textNode->SetEncoding(modifiedDevice->GetContent().encoding);
-          textNode->SetText(modifiedDevice->GetContent().string_msg.c_str());
-          textNode->Modified();
-          textNode->InvokeEvent(modifiedDevice->GetDeviceContentModifiedEvent()->GetValue(0));
-          break;
-          }
-        }
-      else if (strcmp(deviceType,"COMMAND")==0)
-        {
-        break;
-        // Process the modified event from command device.
-        }
-      }
+    this->ProcessIncomingDeviceModifiedEvent(caller, event, callData );
     }
-  /*if(event==IOConnector->RemovedDeviceEvent)
-  {
-    
-  }*/
   //propagate the event to the connector property and treeview widgets
   this->InvokeEvent(event);
 }
@@ -507,30 +602,6 @@ void vtkMRMLIGTLConnectorNode::Copy(vtkMRMLNode *anode)
 
 
 //----------------------------------------------------------------------------
-void vtkMRMLIGTLConnectorNode::ProcessMRMLEvents( vtkObject *caller, unsigned long event, void *callData )
-{
-  Superclass::ProcessMRMLEvents(caller, event, callData);
-  vtkMRMLNode* node = vtkMRMLNode::SafeDownCast(caller);
-  if (!node)
-    {
-    return;
-    }
-
-  int n = this->GetNumberOfNodeReferences(this->GetOutgoingNodeReferenceRole());
-
-  for (int i = 0; i < n; i ++)
-  {
-    const char* id = GetNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
-    if (strcmp(node->GetID(), id) == 0)
-    {
-      this->PushNode(node, event);
-    }
-  }
-}
-
-
-
-//----------------------------------------------------------------------------
 void vtkMRMLIGTLConnectorNode::PrintSelf(ostream& os, vtkIndent indent)
 {
   Superclass::PrintSelf(os,indent);
@@ -677,8 +748,9 @@ void vtkMRMLIGTLConnectorNode::OnNodeReferenceAdded(vtkMRMLNodeReference *refere
     // TODO: Remove the reference ID?
     return;
       }
+    device->SetMessageDirection(igtlio::Device::MESSAGE_DIRECTION_OUT);
     this->AssignNodeToDevice(node, device);
-    this->NewDeviceEventObeserverTag = IOConnector->AddObserver(IOConnector->NewDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
+    this->NewDeviceEventObeserverTag = IOConnector->AddObserver(IOConnector->NewDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
   
     this->MRMLNameToDeviceMap[node->GetName()] = device;
     
@@ -704,31 +776,6 @@ void vtkMRMLIGTLConnectorNode::OnNodeReferenceAdded(vtkMRMLNodeReference *refere
       }
     }
   }
-}
-
-std::string vtkMRMLIGTLConnectorNode::GetDeviceTypeFromMRMLNodeType(const char* type)
-{
-  if(strcmp(type, "Volume")==0 || strcmp(type, "VectorVolume")==0)
-  {
-    return std::string("IMAGE");
-  }
-  if(strcmp(type, "IGTLStatus")==0)
-  {
-    return std::string("STATUS");
-  }
-  if(strcmp(type, "LinearTransform")==0)
-  {
-    return std::string("TRANSFORM");
-  }
-  if(strcmp(type, "Model")==0)
-  {
-    return std::string("POLYDATA");
-  }
-  if(strcmp(type, "FiberBundle")==0)
-  {
-    return std::string("POLYDATA");
-  }
-  return std::string(type);
 }
 
 //---------------------------------------------------------------------------
@@ -895,34 +942,34 @@ int vtkMRMLIGTLConnectorNode::RegisterOutgoingMRMLNode(vtkMRMLNode* node, const 
 {
   
   if (!node)
-  {
+    {
     return 0;
-  }
+    }
   
   // TODO: Need to check the existing device type?
   if (node->GetAttribute("OpenIGTLinkIF.out.type") == NULL)
-  {
+    {
     node->SetAttribute("OpenIGTLinkIF.out.type", devType);
-  }
+    }
   if (node->GetAttribute("OpenIGTLinkIF.out.name") == NULL)
-  {
+    {
     node->SetAttribute("OpenIGTLinkIF.out.name", node->GetName());
-  }
+    }
   
   
   
   // Check if the node is on the reference list for outgoing nodes
   int n = this->GetNumberOfNodeReferences(this->GetOutgoingNodeReferenceRole());
   for (int i = 0; i < n; i ++)
-  {
+    {
     const char* id = GetNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
     if (strcmp(node->GetID(), id) == 0)
-    {
+      {
       // Alredy on the list. Remove it.
       this->RemoveNthNodeReferenceID(this->GetOutgoingNodeReferenceRole(), i);
       break;
+      }
     }
-  }
   
   if (this->AddAndObserveNodeReferenceID(this->GetOutgoingNodeReferenceRole(), node->GetID()))
     {
@@ -933,11 +980,11 @@ int vtkMRMLIGTLConnectorNode::RegisterOutgoingMRMLNode(vtkMRMLNode* node, const 
     igtlio::DevicePointer device = this->IOConnector->GetDevice(key);
     
     if (!device)
-    {
+      {
       device = this->IOConnector->GetDeviceFactory()->create(key.type, key.name);
       device->SetMessageDirection(igtlio::Device::MESSAGE_DIRECTION_OUT);
       this->IOConnector->AddDevice(device);
-    }
+      }
     
     this->MRMLNameToDeviceMap[node->GetName()] = device;
     
@@ -1045,7 +1092,7 @@ int vtkMRMLIGTLConnectorNode::PushNode(vtkMRMLNode* node, int event)
   
   int e = event;
   if (e < 0)
-  {
+    {
     // If event is not specified,
     // Obtain a node event that will be accepted by the MRML to IGTL converter
     vtkIntArray* events = device->GetDeviceContentModifiedEvent(); // need to delete the returned new vtkIntArray
@@ -1054,16 +1101,16 @@ int vtkMRMLIGTLConnectorNode::PushNode(vtkMRMLNode* node, int event)
       e = events->GetValue(0);
     }
     events->Delete();
-  }
+    }
   if(e==device->GetDeviceContentModifiedEvent()->GetValue(0)
      && (strcmp(node->GetClassName(),"vtkMRMLIGTLQueryNode")!=0))
-  {
-    this->IOConnector->SendMessage(key);
-  }
+    {
+    device->InvokeEvent(e, device); //
+    }
   else if(strcmp(node->GetClassName(),"vtkMRMLIGTLQueryNode")==0)
-  {
+    {
     this->IOConnector->SendMessage(key, device->MESSAGE_PREFIX_RTS);
-  }
+    }
   return 0;
 }
 
@@ -1086,7 +1133,7 @@ void vtkMRMLIGTLConnectorNode::PushQuery(vtkMRMLIGTLQueryNode* node)
     this->IOConnector->RemoveObserver(this->NewDeviceEventObeserverTag);
     vtkSmartPointer<igtlio::DeviceCreator> deviceCreator = LocalDeviceFactory->GetCreator(key.GetBaseTypeName());
     this->IOConnector->AddDevice(deviceCreator->Create(key.name));
-    this->NewDeviceEventObeserverTag = IOConnector->AddObserver(IOConnector->NewDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIncomingVTKObjectEvents);
+    this->NewDeviceEventObeserverTag = IOConnector->AddObserver(IOConnector->NewDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
   }
   this->IOConnector->SendMessage(key, igtlio::Device::MESSAGE_PREFIX_RTS);
   this->QueryQueueMutex->Lock();
