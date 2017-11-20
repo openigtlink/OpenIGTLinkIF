@@ -154,7 +154,7 @@ QStandardItem* qMRMLIGTLIOModel::insertNode(vtkMRMLNode* node, QStandardItem* pa
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
     qvtkConnect(node, igtlio::Connector::NewDeviceEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, igtlio::Connector::DeviceModifiedEvent,
+    qvtkConnect(node, igtlio::Connector::DeviceContentModifiedEvent,
                 this, SLOT(onDeviceVisibilityModified(vtkObject*)));
 
     }
@@ -356,15 +356,10 @@ void qMRMLIGTLIOModel::updateIOTreeBranch(vtkMRMLIGTLConnectorNode* node, QStand
         item2->setData("io"+QString(inode->GetID()), qMRMLSceneModel::UIDRole);
         item2->setFlags(Qt::ItemIsEnabled|Qt::ItemIsSelectable);
         
-        igtlio::Device* device = NULL;
-        vtkMRMLIGTLConnectorNode::MessageDeviceMapType::iterator iter = node->MRMLNameToDeviceMap.find(inode->GetName());
-        if (iter != node->MRMLNameToDeviceMap.end())
+        std::string deviceType = node->GetDeviceTypeFromMRMLNodeType(inode->GetNodeTagName());
+        if (deviceType.size() != 0)
         {
-          device = iter->second;
-        }
-        if (device)
-        {
-          item2->setText(device->GetDeviceType().c_str());
+          item2->setText(deviceType.c_str());
         }
         else
         {

@@ -59,6 +59,11 @@ public:
   vtkSetMacro (Encoding, int);
   vtkGetMacro (Encoding, int);
 
+  enum
+  {
+    TextModifiedEvent  = 30001,
+  };
+
 protected:
   vtkMRMLTextNode();
   ~vtkMRMLTextNode();

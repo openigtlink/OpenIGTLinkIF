@@ -287,8 +287,8 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
   vtkSmartPointer<igtlio::Device> device = NULL;
   if(dnode)
     {
-    vtkMRMLIGTLConnectorNode::MessageDeviceMapType::iterator iter = cnode->MRMLNameToDeviceMap.find(dnode->GetName());
-    if (iter == cnode->MRMLNameToDeviceMap.end())
+    vtkMRMLIGTLConnectorNode::MessageDeviceMapType::iterator iter = cnode->MRMLIDToDeviceMap.find(dnode->GetID());
+    if (iter == cnode->MRMLIDToDeviceMap.end())
       {
       igtlio::DeviceKeyType key;
       key.name = dnode->GetName();
@@ -299,6 +299,7 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
         device = cnode->IOConnector->GetDeviceFactory()->create(key.type, key.name);
         if (device)
           {
+          cnode->MRMLIDToDeviceMap[dnode->GetID()] = device;
           cnode->IOConnector->AddDevice(device);
           }
         else
@@ -306,11 +307,10 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
           return;
           }
         }
-      cnode->MRMLNameToDeviceMap[dnode->GetName()] = device;
       }
     else
       {
-      device = cnode->MRMLNameToDeviceMap[dnode->GetName()];
+      device = cnode->MRMLIDToDeviceMap[dnode->GetID()];
       }
     }
   if (index.column() == qMRMLIGTLIOModel::VisualizationColumn)
@@ -332,7 +332,7 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
         dnode->SetAttribute("IGTLVisible", "true");
         device->SetVisibility(true);
         }
-      cnode->InvokeEvent(igtlio::Connector::DeviceModifiedEvent);
+      cnode->InvokeEvent(igtlio::Connector::DeviceContentModifiedEvent);
       }
     emit ioTreeViewUpdated(type, cnode, dir, dnode);
     }
@@ -352,7 +352,7 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
         dnode->SetAttribute("OpenIGTLinkIF.pushOnConnect", "true");
         device->SetPushOnConnect(true);
         }
-      cnode->InvokeEvent(igtlio::Connector::DeviceModifiedEvent);
+      cnode->InvokeEvent(igtlio::Connector::DeviceContentModifiedEvent);
       }
     emit ioTreeViewUpdated(type, cnode, dir, dnode);
     }

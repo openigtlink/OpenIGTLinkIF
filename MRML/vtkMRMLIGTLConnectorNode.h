@@ -108,7 +108,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   // Description:
   // A function to explicitly push node to OpenIGTLink. The function is called either by
   // external nodes or MRML event hander in the connector node.
-  int PushNode(vtkMRMLNode* node, int event=-1);
+  int PushNode(vtkMRMLNode* node);
   
   // Query queueing mechanism is needed to send all queries from the connector thread.
   // Queries can be pushed to the end of the QueryQueue by calling RequestInvoke from any thread,
@@ -148,8 +148,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   
   std::string GetDeviceTypeFromMRMLNodeType(const char* NodeTag);
   
-  igtlio::DevicePointer GetDeviceByIGTLDeviceKey(igtlio::DeviceKeyType key);
-
   std::vector<std::string> GetNodeTagFromDeviceType(const char * deviceType);
   
   typedef std::map<std::string, igtlio::Connector::NodeInfoType>   NodeInfoMapType;
@@ -158,7 +156,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
 
   typedef std::map<std::string,  std::vector<std::string> > DeviceTypeToNodeTagMapType;
   
-  MessageDeviceMapType  MRMLNameToDeviceMap;
+  MessageDeviceMapType  MRMLIDToDeviceMap;
 
   DeviceTypeToNodeTagMapType DeviceTypeToNodeTagMap;
 
@@ -182,11 +180,13 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   vtkMRMLIGTLConnectorNode(const vtkMRMLIGTLConnectorNode&);
   void operator=(const vtkMRMLIGTLConnectorNode&);
 
-  int AssignNodeToDevice(vtkMRMLNode* node, igtlio::DevicePointer device);
+  unsigned int AssignNodeToDevice(vtkMRMLNode* node, igtlio::DevicePointer device);
 
   void ProcessNewDeviceEvent(vtkObject *caller, unsigned long event, void *callData );
 
-  void ProcessIncomingDeviceModifiedEvent(vtkObject *caller, unsigned long event, void *callData );
+  void ProcessIncomingDeviceModifiedEvent(vtkObject *caller, unsigned long event, igtlio::Device * modifiedDevice);
+
+  void ProcessOutgoingDeviceModifiedEvent(vtkObject *caller, unsigned long event, igtlio::Device * modifiedDevice);
 
   vtkMRMLNode* GetOrAddMRMLNodeforDevice(igtlio::Device* device);
   
@@ -213,7 +213,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   
   igtlio::DeviceFactoryPointer LocalDeviceFactory;
   
-  unsigned long NewDeviceEventObeserverTag;
+  unsigned long DeviceContentModifiedEventObserverTag;
   
 };
 
