@@ -259,17 +259,9 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOrAddMRMLNodeforDevice(igtlio::Device*
     igtlio::PolyDataDevice* polyDevice = reinterpret_cast<igtlio::PolyDataDevice*>(device);
     igtlio::PolyDataConverter::ContentData content = polyDevice->GetContent();
     
+    vtkMRMLModelNode* modelNode = NULL;    
     std::string mrmlNodeTagName = "";
-    igtl::MessageBase::MetaDataMap metaInfo = device->GetMetaData();
-    vtkMRMLModelNode* modelNode = NULL;
-    if (metaInfo.size())
-      {
-      if(metaInfo.find(MEMLNodeNameKey) != metaInfo.end())
-        {
-        mrmlNodeTagName = metaInfo.find(MEMLNodeNameKey)->second.second;
-        }
-      }
-    if(!(mrmlNodeTagName.compare("")==0))
+    if(device->GetMetaDataElement(MEMLNodeNameKey, mrmlNodeTagName))
       {
       std::string className = this->GetScene()->GetClassNameByTag(mrmlNodeTagName.c_str());
       vtkMRMLNode * createdNode = this->GetScene()->CreateNodeByClass(className.c_str());
@@ -1067,9 +1059,8 @@ int vtkMRMLIGTLConnectorNode::PushNode(vtkMRMLNode* node)
   igtlio::DeviceKeyType key;
   key.name = device->GetDeviceName();
   key.type = device->GetDeviceType();
-  igtl::MessageBase::MetaDataMap souceMetaInfo;
-  souceMetaInfo[MEMLNodeNameKey] = std::pair<IANA_ENCODING_TYPE, std::string>(IANA_TYPE_US_ASCII, node->GetNodeTagName());
-  device->SetMetaData(souceMetaInfo);
+  device->ClearMetaData();
+  device->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, node->GetNodeTagName());
   this->IOConnector->RemoveObserver(this->DeviceContentModifiedEventObserverTag);
   this->AssignNodeToDevice(node, device); // update the device content
   this->DeviceContentModifiedEventObserverTag = IOConnector->AddObserver(IOConnector->DeviceContentModifiedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
