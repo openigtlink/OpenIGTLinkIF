@@ -154,7 +154,7 @@ QStandardItem* qMRMLIGTLIOModel::insertNode(vtkMRMLNode* node, QStandardItem* pa
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
     qvtkConnect(node, igtlio::Connector::NewDeviceEvent,
                 this, SLOT(onMRMLNodeModified(vtkObject*)));
-    qvtkConnect(node, igtlio::Connector::DeviceContentModifiedEvent,
+    qvtkConnect(node, vtkMRMLIGTLConnectorNode::DeviceModifiedEvent,
                 this, SLOT(onDeviceVisibilityModified(vtkObject*)));
 
     }

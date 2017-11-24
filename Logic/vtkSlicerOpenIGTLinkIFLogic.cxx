@@ -138,7 +138,7 @@ void vtkSlicerOpenIGTLinkIFLogic::AddMRMLConnectorNodeObserver(vtkMRMLIGTLConnec
   vtkUnObserveMRMLNodeMacro(connectorNode);
   // Start observing the connector node
   vtkNew<vtkIntArray> connectorNodeEvents;
-  connectorNodeEvents->InsertNextValue(connectorNode->IOConnector->DeviceContentModifiedEvent);
+  connectorNodeEvents->InsertNextValue(connectorNode->DeviceModifiedEvent);
   vtkObserveMRMLNodeEventsMacro(connectorNode, connectorNodeEvents.GetPointer());
 }
 
@@ -449,7 +449,7 @@ void vtkSlicerOpenIGTLinkIFLogic::ProcessMRMLNodesEvents(vtkObject * caller, uns
     vtkSlicerModuleLogic::ProcessMRMLNodesEvents(caller, event, callData);
 
     vtkMRMLIGTLConnectorNode* cnode = vtkMRMLIGTLConnectorNode::SafeDownCast(caller);
-    if (cnode && event == cnode->IOConnector->DeviceContentModifiedEvent)
+    if (cnode && event == cnode->DeviceModifiedEvent)
       {
       // Check visibility
       int nnodes;

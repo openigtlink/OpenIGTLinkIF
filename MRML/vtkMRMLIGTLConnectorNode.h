@@ -37,6 +37,11 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   //----------------------------------------------------------------
   // Standard methods for MRML nodes
   //----------------------------------------------------------------
+  
+  enum{
+    DeviceModifiedEvent = 118950
+  };
+  
 
   static vtkMRMLIGTLConnectorNode *New();
   vtkTypeMacro(vtkMRMLIGTLConnectorNode,vtkMRMLNode);
@@ -210,10 +215,6 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   vtkGetStringMacro(OutgoingNodeReferenceMRMLAttributeName);
   
   NodeInfoMapType IncomingMRMLNodeInfoMap;
-  
-  igtlio::DeviceFactoryPointer LocalDeviceFactory;
-  
-  unsigned long DeviceContentModifiedEventObserverTag;
   
 };
 

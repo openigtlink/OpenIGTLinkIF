@@ -332,7 +332,7 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
         dnode->SetAttribute("IGTLVisible", "true");
         device->SetVisibility(true);
         }
-      cnode->InvokeEvent(igtlio::Connector::DeviceContentModifiedEvent);
+      cnode->InvokeEvent(cnode->DeviceModifiedEvent);
       }
     emit ioTreeViewUpdated(type, cnode, dir, dnode);
     }
@@ -352,7 +352,7 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
         dnode->SetAttribute("OpenIGTLinkIF.pushOnConnect", "true");
         device->SetPushOnConnect(true);
         }
-      cnode->InvokeEvent(igtlio::Connector::DeviceContentModifiedEvent);
+      cnode->InvokeEvent(cnode->DeviceModifiedEvent);
       }
     emit ioTreeViewUpdated(type, cnode, dir, dnode);
     }

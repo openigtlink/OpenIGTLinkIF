@@ -53,7 +53,6 @@ vtkMRMLIGTLConnectorNode::vtkMRMLIGTLConnectorNode()
   this->IncomingMRMLNodeInfoMap.clear();
   IOConnector = igtlio::Connector::New();
   this->ConnectEvents();
-  LocalDeviceFactory = igtlio::DeviceFactoryPointer::New();
  
   this->IncomingNodeReferenceRole=NULL;
   this->IncomingNodeReferenceMRMLAttributeName=NULL;
@@ -92,7 +91,6 @@ void vtkMRMLIGTLConnectorNode::ConnectEvents()
   IOConnector->AddObserver(IOConnector->ActivatedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
   IOConnector->AddObserver(IOConnector->DeactivatedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
   IOConnector->AddObserver(IOConnector->NewDeviceEvent, this,  &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
-  this->DeviceContentModifiedEventObserverTag = IOConnector->AddObserver(IOConnector->DeviceContentModifiedEvent,this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
   IOConnector->AddObserver(IOConnector->RemovedDeviceEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
 }
 
@@ -403,30 +401,38 @@ void vtkMRMLIGTLConnectorNode::ProcessMRMLEvents( vtkObject *caller, unsigned lo
 void vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents(vtkObject *caller, unsigned long event, void *callData )
 {
   igtlio::Connector* connector = reinterpret_cast<igtlio::Connector*>(caller);
+  igtlio::Device* modifiedDevice = reinterpret_cast<igtlio::Device*>(callData);
   if (connector == NULL)
     {
     // we are only interested in proxy node modified events
     return;
     }
-  if(event==IOConnector->NewDeviceEvent)
+  if( modifiedDevice != NULL)
     {
-    // no action perform at this stage, wait until the message content in the device is unpacked,
-    // As we need the message content data to create mrmlnode.
-    // Also the newly added device could also be a outgoing message from IF module
-    this->ProcessNewDeviceEvent(caller, event, callData );
-    }
-  if(event==IOConnector->DeviceContentModifiedEvent)
-    {
-    igtlio::Device* modifiedDevice = reinterpret_cast<igtlio::Device*>(callData);
-    if (modifiedDevice->MessageDirectionIsIn())
+    if(event==IOConnector->NewDeviceEvent)
       {
-      this->ProcessIncomingDeviceModifiedEvent(caller, event, modifiedDevice);
+      // no action perform at this stage, wait until the message content in the device is unpacked,
+      // As we need the message content data to create mrmlnode.
+      // Also the newly added device could also be a outgoing message from IF module
+      //this->ProcessNewDeviceEvent(caller, event, callData );
+      //modifiedDevice->AddObserver(modifiedDevice->GetDeviceContentModifiedEvent(),  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+      if (modifiedDevice->MessageDirectionIsIn())
+        {
+        modifiedDevice->AddObserver(modifiedDevice->GetDeviceContentModifiedEvent(),  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+        }
       }
-    else if (modifiedDevice->MessageDirectionIsOut())
+    if(event==modifiedDevice->GetDeviceContentModifiedEvent())
       {
-      this->ProcessOutgoingDeviceModifiedEvent(caller, event, modifiedDevice);
+      if (modifiedDevice->MessageDirectionIsIn())
+        {
+        this->ProcessIncomingDeviceModifiedEvent(caller, event, modifiedDevice);
+        }
+      else if (modifiedDevice->MessageDirectionIsOut())
+        {
+        this->ProcessOutgoingDeviceModifiedEvent(caller, event, modifiedDevice);
+        }
+      
       }
-    
     }
   //propagate the event to the connector property and treeview widgets
   this->InvokeEvent(event);
@@ -716,7 +722,6 @@ void vtkMRMLIGTLConnectorNode::OnNodeReferenceAdded(vtkMRMLNodeReference *refere
   }
   else
   {
-    this->IOConnector->RemoveObserver(this->DeviceContentModifiedEventObserverTag);
     // Find a converter for the node
     igtlio::DevicePointer device = NULL;
     MessageDeviceMapType::iterator citer = this->MRMLIDToDeviceMap.find(node->GetID());
@@ -729,6 +734,7 @@ void vtkMRMLIGTLConnectorNode::OnNodeReferenceAdded(vtkMRMLNodeReference *refere
       if(device == NULL)
         {
         device = IOConnector->GetDeviceFactory()->create(key.type, key.name);
+        device->SetMessageDirection(igtlio::Device::MESSAGE_DIRECTION_OUT);
         if (device)
           {
           this->MRMLIDToDeviceMap[node->GetID()] = device;
@@ -747,7 +753,7 @@ void vtkMRMLIGTLConnectorNode::OnNodeReferenceAdded(vtkMRMLNodeReference *refere
       }
     device->SetMessageDirection(igtlio::Device::MESSAGE_DIRECTION_OUT);
     unsigned int NodeModifiedEvent = this->AssignNodeToDevice(node, device);
-    this->DeviceContentModifiedEventObserverTag = IOConnector->AddObserver(IOConnector->DeviceContentModifiedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+    device->AddObserver(device->GetDeviceContentModifiedEvent(),  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
         
     // Need to update the events here because observed events are not saved in the scene
     // for each reference and therefore only the role-default event observers are added.
@@ -778,30 +784,37 @@ void vtkMRMLIGTLConnectorNode::OnNodeReferenceRemoved(vtkMRMLNodeReference *refe
 {
   const char* nodeID = reference->GetReferencedNodeID();
   if (!nodeID)
-  {
+    {
     return;
-  }
+    }
   if (strcmp(reference->GetReferenceRole(), this->GetIncomingNodeReferenceRole()) == 0)
-  {
+    {
     // Check if the node has already been reagistered.
     // TODO: MRMLNodeListType can be reimplemented as a std::list
     // so that the converter can be removed by 'remove()' method.
     NodeInfoMapType::iterator iter;
     iter = this->IncomingMRMLNodeInfoMap.find(nodeID);
     if (iter != this->IncomingMRMLNodeInfoMap.end())
-    {
+      {
       this->IncomingMRMLNodeInfoMap.erase(iter);
+      }
     }
-  }
   else
-  {
+    {
     // Search converter from MRMLIDToDeviceMap
     MessageDeviceMapType::iterator citer = this->MRMLIDToDeviceMap.find(nodeID);
     if (citer != this->MRMLIDToDeviceMap.end())
-    {
+      {
+      vtkSmartPointer<igtlio::Device> device = citer->second;
+      device->RemoveObserver(device->GetDeviceContentModifiedEvent());
+      this->IOConnector->RemoveDevice(device);
       this->MRMLIDToDeviceMap.erase(citer);
+      }
+    else
+      {
+      vtkErrorMacro("Node is not found in MRMLIDToDeviceMap: "<<nodeID);
+      }
     }
-  }
 }
 
 
@@ -1061,9 +1074,9 @@ int vtkMRMLIGTLConnectorNode::PushNode(vtkMRMLNode* node)
   key.type = device->GetDeviceType();
   device->ClearMetaData();
   device->SetMetaDataElement(MEMLNodeNameKey, IANA_TYPE_US_ASCII, node->GetNodeTagName());
-  this->IOConnector->RemoveObserver(this->DeviceContentModifiedEventObserverTag);
+  device->RemoveObservers(device->GetDeviceContentModifiedEvent());
   this->AssignNodeToDevice(node, device); // update the device content
-  this->DeviceContentModifiedEventObserverTag = IOConnector->AddObserver(IOConnector->DeviceContentModifiedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+  device->AddObserver(device->GetDeviceContentModifiedEvent(),  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
   
   if((strcmp(node->GetClassName(),"vtkMRMLIGTLQueryNode")!=0))
     {
@@ -1089,13 +1102,10 @@ void vtkMRMLIGTLConnectorNode::PushQuery(vtkMRMLIGTLQueryNode* node)
   key.name = node->GetIGTLDeviceName();
   key.type = node->GetIGTLName();
   
-  //igtlio::DevicePointer creater = LocalDeviceFactory->create(node->GetIGTLName(),"");
   if(this->IOConnector->GetDevice(key)==NULL)
   {
-    this->IOConnector->RemoveObserver(this->DeviceContentModifiedEventObserverTag);
-    vtkSmartPointer<igtlio::DeviceCreator> deviceCreator = LocalDeviceFactory->GetCreator(key.GetBaseTypeName());
+    vtkSmartPointer<igtlio::DeviceCreator> deviceCreator = IOConnector->GetDeviceFactory()->GetCreator(key.GetBaseTypeName());
     this->IOConnector->AddDevice(deviceCreator->Create(key.name));
-    this->DeviceContentModifiedEventObserverTag = IOConnector->AddObserver(IOConnector->DeviceContentModifiedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
   }
   this->IOConnector->SendMessage(key, igtlio::Device::MESSAGE_PREFIX_RTS);
   this->QueryQueueMutex->Lock();
