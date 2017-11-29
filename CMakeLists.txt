@@ -6,8 +6,13 @@ set(MODULE_TITLE "OpenIGTLink I/F")
 string(TOUPPER ${MODULE_NAME} MODULE_NAME_UPPER)
 
 #-----------------------------------------------------------------------------
-find_package(Slicer REQUIRED)
-include(${Slicer_USE_FILE})
+if(Slicer_SOURCE_DIR)
+  find_package(OpenIGTLink REQUIRED)
+  include(${OpenIGTLink_USE_FILE})
+else()
+  find_package(Slicer REQUIRED)
+  include(${Slicer_USE_FILE})
+endif()
 
 # --------------------------------------------------------------------------
 # Check if version 2 protocol is available
@@ -93,7 +98,6 @@ slicerMacroBuildQtModule(
   TARGET_LIBRARIES ${MODULE_TARGET_LIBRARIES}
   RESOURCES ${MODULE_RESOURCES}
   )
-
 
 if(BUILD_TESTING)
   #add_subdirectory(Testing)
