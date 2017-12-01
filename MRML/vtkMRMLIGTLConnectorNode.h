@@ -39,7 +39,9 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   //----------------------------------------------------------------
   
   enum{
-    DeviceModifiedEvent = 118950
+    DeviceModifiedEvent = igtlio::Connector::DeviceContentModifiedEvent,
+    CommandReceivedEvent    = igtlio::Device::CommandReceivedEvent, // COMMAND device got a query, COMMAND received
+    CommandResponseReceivedEvent = igtlio::Device::CommandResponseReceivedEvent  // COMMAND device got a response, RTS_COMMAND received
   };
   
 
@@ -121,8 +123,10 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   // Use a weak pointer to make sure we don't try to access the query node after it is deleted from the scene.
   std::list< vtkWeakPointer<vtkMRMLIGTLQueryNode> > QueryWaitingQueue;
   vtkMutexLock* QueryQueueMutex;
-  
-  
+
+  //----------------------------------------------------------------
+  // For controling remote devices
+  //----------------------------------------------------------------
   // Description:
   // Push query int the query list.
   void PushQuery(vtkMRMLIGTLQueryNode* query);
@@ -130,6 +134,17 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   // Description:
   // Removes query from the query list.
   void CancelQuery(vtkMRMLIGTLQueryNode* node);
+
+  ///  Send the given command from the given device.
+  /// - If using BLOCKING, the call blocks until a response appears or timeout. Return response.
+  /// - If using ASYNCHRONOUS, wait for the CommandResponseReceivedEvent event. Return device.
+  ///
+  igtlio::CommandDevicePointer SendCommand(std::string device_id, std::string command, std::string content, igtlio::SYNCHRONIZATION_TYPE synchronized = igtlio::BLOCKING, double timeout_s = 5);
+
+  /// Send a command response from the given device. Asynchronous.
+  /// Precondition: The given device has received a query that is not yet responded to.
+  /// Return device.
+  igtlio::CommandDevicePointer SendCommandResponse(std::string device_id, std::string command, std::string content);
   
   //----------------------------------------------------------------
   // For OpenIGTLink time stamp access

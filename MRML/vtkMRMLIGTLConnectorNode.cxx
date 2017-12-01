@@ -18,6 +18,7 @@ Version:   $Revision: 1.2 $
 #include "igtlioCommandDevice.h"
 #include "igtlioPolyDataDevice.h"
 #include "igtlioStringDevice.h"
+#include "igtlOSUtil.h"
 
 // OpenIGTLinkIF MRML includes
 #include "vtkMRMLIGTLConnectorNode.h"
@@ -37,6 +38,9 @@ Version:   $Revision: 1.2 $
 #include <vtkImageData.h>
 #include <vtkMatrix4x4.h>
 #include <vtkPolyData.h>
+
+// VTK include
+#include <vtksys/SystemTools.hxx>
 
 #define MEMLNodeNameKey "MEMLNodeName"
 
@@ -419,6 +423,11 @@ void vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents(vtkObject *caller, unsig
       if (modifiedDevice->MessageDirectionIsIn())
         {
         modifiedDevice->AddObserver(modifiedDevice->GetDeviceContentModifiedEvent(),  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+        if (modifiedDevice->GetDeviceType().compare(igtlio::CommandConverter::GetIGTLTypeName()) == 0)
+          {
+          modifiedDevice->AddObserver(modifiedDevice->CommandReceivedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+          modifiedDevice->AddObserver(modifiedDevice->CommandResponseReceivedEvent,  this, &vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents);
+          }
         }
       }
     if(event==modifiedDevice->GetDeviceContentModifiedEvent())
@@ -431,12 +440,66 @@ void vtkMRMLIGTLConnectorNode::ProcessIOConnectorEvents(vtkObject *caller, unsig
         {
         this->ProcessOutgoingDeviceModifiedEvent(caller, event, modifiedDevice);
         }
-      
+      }
+    if(event==modifiedDevice->CommandReceivedEvent || event==modifiedDevice->CommandResponseReceivedEvent)
+      {
+      this->InvokeEvent(event, modifiedDevice);
+      return;
       }
     }
   //propagate the event to the connector property and treeview widgets
   this->InvokeEvent(event);
 }
+
+igtlio::CommandDevicePointer vtkMRMLIGTLConnectorNode::SendCommand(std::string device_id, std::string command, std::string content, igtlio::SYNCHRONIZATION_TYPE synchronized, double timeout_s)
+{
+  igtlio::CommandDevicePointer device = IOConnector->SendCommand( device_id, command, content );
+
+  if (synchronized==igtlio::BLOCKING)
+  {
+    double starttime = vtkTimerLog::GetUniversalTime();
+    while (vtkTimerLog::GetUniversalTime() - starttime < timeout_s)
+    {
+      IOConnector->PeriodicProcess();
+      vtksys::SystemTools::Delay(5);
+
+      igtlio::CommandDevicePointer response = device->GetResponseFromCommandID(device->GetContent().id);
+
+      if (response.GetPointer())
+      {
+        return response;
+      }
+    }
+  }
+  else
+  {
+    return device;
+  }
+  return vtkSmartPointer<igtlio::CommandDevice>();
+}
+
+
+igtlio::CommandDevicePointer vtkMRMLIGTLConnectorNode::SendCommandResponse(std::string device_id, std::string command, std::string content)
+{
+  igtlio::DeviceKeyType key(igtlio::CommandConverter::GetIGTLTypeName(), device_id);
+  igtlio::CommandDevicePointer device = igtlio::CommandDevice::SafeDownCast(IOConnector->GetDevice(key));
+
+  igtlio::CommandConverter::ContentData contentdata = device->GetContent();
+
+  if (command != contentdata.name)
+  {
+    vtkErrorMacro("Requested command response " << command << " does not match the existing query: " << contentdata.name);
+    return igtlio::CommandDevicePointer();
+  }
+
+  contentdata.name = command;
+  contentdata.content = content;
+  device->SetContent(contentdata);
+
+  IOConnector->SendMessage(CreateDeviceKey(device), igtlio::Device::MESSAGE_PREFIX_RTS);
+  return device;
+}
+
 
 //----------------------------------------------------------------------------
 void vtkMRMLIGTLConnectorNode::WriteXML(ostream& of, int nIndent)
