@@ -156,19 +156,19 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOrAddMRMLNodeforDevice(igtlio::Device*
     vtkMRMLNode* node = this->GetScene()->GetNodeByID((inIter->first));
     if(node)
       {
-      const char * deviceType = device->GetDeviceType().c_str();
-      const char * deviceName = device->GetDeviceName().c_str();
+      const std::string deviceType = device->GetDeviceType();
+      const std::string deviceName = device->GetDeviceName();
       bool typeMatched = false;
-      for (unsigned int i = 0; i < this->GetNodeTagFromDeviceType(deviceType).size(); i++)
+      for (unsigned int i = 0; i < this->GetNodeTagFromDeviceType(deviceType.c_str()).size(); i++)
         {
-        const char* nodeTage = this->GetNodeTagFromDeviceType(deviceType)[i].c_str();
-        if (strcmp(node->GetNodeTagName(), nodeTage) == 0)
+        const std::string nodeTag = this->GetNodeTagFromDeviceType(deviceType.c_str())[i];
+        if (strcmp(node->GetNodeTagName(), nodeTag.c_str()) == 0)
           {
           typeMatched = 1;
           break;
           }
         }
-      if (typeMatched && strcmp(node->GetName(), deviceName) == 0)
+      if (typeMatched && strcmp(node->GetName(), deviceName.c_str()) == 0)
         {
         return node;
         }
@@ -181,7 +181,7 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOrAddMRMLNodeforDevice(igtlio::Device*
     igtlio::ImageDevice* imageDevice = reinterpret_cast<igtlio::ImageDevice*>(device);
     igtlio::ImageConverter::ContentData content = imageDevice->GetContent();
     vtkSmartPointer<vtkMRMLVolumeNode> volumeNode;
-    int numberOfComponents = 1; //to improve the io module to be able to cope with video data
+    int numberOfComponents = content.image->GetNumberOfScalarComponents(); //to improve the io module to be able to cope with video data
     if (numberOfComponents == 1)
       {
       volumeNode = vtkSmartPointer<vtkMRMLScalarVolumeNode>::New();
@@ -314,14 +314,14 @@ void vtkMRMLIGTLConnectorNode::ProcessOutgoingDeviceModifiedEvent(vtkObject *cal
 void vtkMRMLIGTLConnectorNode::ProcessIncomingDeviceModifiedEvent(vtkObject *caller, unsigned long event, igtlio::Device * modifiedDevice)
 {
   vtkMRMLNode* modifiedNode = this->GetOrAddMRMLNodeforDevice(modifiedDevice);
-  const char * deviceType = modifiedDevice->GetDeviceType().c_str();
-  const char * deviceName = modifiedDevice->GetDeviceName().c_str();
-  if (this->GetNodeTagFromDeviceType(deviceType).size() > 0)
+  const std::string deviceType = modifiedDevice->GetDeviceType();
+  const std::string deviceName = modifiedDevice->GetDeviceName();
+  if (this->GetNodeTagFromDeviceType(deviceType.c_str()).size() > 0)
     {
-    if (strcmp(deviceType, "IMAGE")==0)
+    if (strcmp(deviceType.c_str(), "IMAGE")==0)
       {
       igtlio::ImageDevice* imageDevice = reinterpret_cast<igtlio::ImageDevice*>(modifiedDevice);
-      if (strcmp(modifiedNode->GetName(), deviceName) == 0)
+      if (strcmp(modifiedNode->GetName(), deviceName.c_str()) == 0)
         {
         vtkMRMLVolumeNode* volumeNode = vtkMRMLVolumeNode::SafeDownCast(modifiedNode);
         volumeNode->SetIJKToRASMatrix(imageDevice->GetContent().transform);
@@ -329,20 +329,20 @@ void vtkMRMLIGTLConnectorNode::ProcessIncomingDeviceModifiedEvent(vtkObject *cal
         volumeNode->Modified();
         }
       }
-    else if (strcmp(deviceType,"STATUS")==0)
+    else if (strcmp(deviceType.c_str(), "STATUS") == 0)
       {
       igtlio::StatusDevice* statusDevice = reinterpret_cast<igtlio::StatusDevice*>(modifiedDevice);
-      if (strcmp(modifiedNode->GetName(), deviceName) == 0)
+      if (strcmp(modifiedNode->GetName(), deviceName.c_str()) == 0)
         {
         vtkMRMLIGTLStatusNode* statusNode = vtkMRMLIGTLStatusNode::SafeDownCast(modifiedNode);
         statusNode->SetStatus(statusDevice->GetContent().code, statusDevice->GetContent().subcode, statusDevice->GetContent().errorname.c_str(), statusDevice->GetContent().statusstring.c_str());
         statusNode->Modified();
         }
       }
-    else if (strcmp(deviceType,"TRANSFORM")==0)
+    else if (strcmp(deviceType.c_str(), "TRANSFORM") == 0)
       {
       igtlio::TransformDevice* transformDevice = reinterpret_cast<igtlio::TransformDevice*>(modifiedDevice);
-      if (strcmp(modifiedNode->GetName(), deviceName) == 0)
+      if (strcmp(modifiedNode->GetName(), deviceName.c_str()) == 0)
         {
         vtkMRMLLinearTransformNode* transformNode = vtkMRMLLinearTransformNode::SafeDownCast(modifiedNode);
         vtkSmartPointer<vtkMatrix4x4> transfromMatrix = vtkMatrix4x4::New();
@@ -351,20 +351,20 @@ void vtkMRMLIGTLConnectorNode::ProcessIncomingDeviceModifiedEvent(vtkObject *cal
         transformNode->Modified();
         }
       }
-    else if (strcmp(deviceType,"POLYDATA")==0)
+    else if (strcmp(deviceType.c_str(), "POLYDATA") == 0)
       {
       igtlio::PolyDataDevice* polyDevice = reinterpret_cast<igtlio::PolyDataDevice*>(modifiedDevice);
-      if (strcmp(modifiedNode->GetName(), deviceName) == 0)
+      if (strcmp(modifiedNode->GetName(), deviceName.c_str()) == 0)
         {
         vtkMRMLModelNode* modelNode = vtkMRMLModelNode::SafeDownCast(modifiedNode);
         modelNode->SetAndObservePolyData(polyDevice->GetContent().polydata);
         modelNode->Modified();
         }
       }
-    else if (strcmp(deviceType,"STRING")==0)
+    else if (strcmp(deviceType.c_str(), "STRING") == 0)
       {
       igtlio::StringDevice* stringDevice = reinterpret_cast<igtlio::StringDevice*>(modifiedDevice);
-      if (strcmp(modifiedNode->GetName(), deviceName) == 0)
+      if (strcmp(modifiedNode->GetName(), deviceName.c_str()) == 0)
         {
         vtkMRMLTextNode* textNode = vtkMRMLTextNode::SafeDownCast(modifiedNode);
         textNode->SetEncoding(stringDevice->GetContent().encoding);
@@ -372,7 +372,7 @@ void vtkMRMLIGTLConnectorNode::ProcessIncomingDeviceModifiedEvent(vtkObject *cal
         textNode->Modified();
         }
       }
-    else if (strcmp(deviceType,"COMMAND")==0)
+    else if (strcmp(deviceType.c_str(), "COMMAND") == 0)
       {
       // Process the modified event from command device.
       }
