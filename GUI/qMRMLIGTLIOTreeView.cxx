@@ -292,8 +292,16 @@ void qMRMLIGTLIOTreeView::onClicked(const QModelIndex& index)
       {
       igtlio::DeviceKeyType key;
       key.name = dnode->GetName();
-      key.type = cnode->GetDeviceTypeFromMRMLNodeType(dnode->GetNodeTagName());
-      device = cnode->IOConnector->GetDevice(key);
+      std::vector<std::string> deviceTypes = cnode->GetDeviceTypeFromMRMLNodeType(dnode->GetNodeTagName());
+      for (int typeIndex = 0; typeIndex < deviceTypes.size(); typeIndex++)
+        {
+        key.type = deviceTypes[typeIndex];
+        device = cnode->IOConnector->GetDevice(key);
+        if (device != NULL)
+          {
+          break;
+          }
+        }
       if(device == NULL)
         {
         device = cnode->IOConnector->GetDeviceFactory()->create(key.type, key.name);

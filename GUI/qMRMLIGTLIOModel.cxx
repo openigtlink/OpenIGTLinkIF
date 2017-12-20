@@ -355,11 +355,22 @@ void qMRMLIGTLIOModel::updateIOTreeBranch(vtkMRMLIGTLConnectorNode* node, QStand
         QStandardItem* item2 = new QStandardItem;
         item2->setData("io"+QString(inode->GetID()), qMRMLSceneModel::UIDRole);
         item2->setFlags(Qt::ItemIsEnabled|Qt::ItemIsSelectable);
-        
-        std::string deviceType = node->GetDeviceTypeFromMRMLNodeType(inode->GetNodeTagName());
-        if (deviceType.size() != 0)
+        std::vector<std::string> deviceTypes = node->GetDeviceTypeFromMRMLNodeType(inode->GetNodeTagName());
+        igtlio::DeviceKeyType key;
+        vtkSmartPointer<igtlio::Device> device = NULL;
+        key.name = inode->GetName();
+        for(int typeIndex = 0; typeIndex < deviceTypes.size(); typeIndex++)
+          {
+          key.type = deviceTypes[typeIndex];
+          device = node->IOConnector->GetDevice(key);
+          if (device != NULL)
+            {
+            break;
+            }
+          }
+        if (device != NULL)
         {
-          item2->setText(deviceType.c_str());
+          item2->setText(device->GetDeviceType().c_str());
         }
         else
         {

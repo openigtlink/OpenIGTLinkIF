@@ -166,7 +166,7 @@ class VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLIGTLConnectorNode : pub
   
   igtlio::Connector* IOConnector;
   
-  std::string GetDeviceTypeFromMRMLNodeType(const char* NodeTag);
+  std::vector<std::string> GetDeviceTypeFromMRMLNodeType(const char* NodeTag);
   
   std::vector<std::string> GetNodeTagFromDeviceType(const char * deviceType);
   
