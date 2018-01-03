@@ -30,12 +30,14 @@ Version:   $Revision: 1.2 $
 #include <vtkMRMLScalarVolumeDisplayNode.h>
 #include <vtkMRMLVectorVolumeNode.h>
 #include <vtkMRMLVectorVolumeDisplayNode.h>
+#include <vtkMRMLBitStreamNode.h>
 #include <vtkMRMLModelNode.h>
 #include <vtkMRMLTextNode.h>
 #include <vtkMRMLIGTLStatusNode.h>
 #include <vtkMRMLLinearTransformNode.h>
 #include <vtkMRMLColorLogic.h>
 #include <vtkMRMLColorTableNode.h>
+#include <vtkCollection.h>
 #include <vtkMutexLock.h>
 #include <vtkTimerLog.h>
 #include <vtkImageData.h>
@@ -217,16 +219,10 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOrAddMRMLNodeforDevice(igtlio::Device*
     volumeNode->SetAndObserveImageData(image);
     volumeNode->SetName(deviceName.c_str());
     Scene->SaveStateForUndo();
-    
-    vtkDebugMacro("Setting scene info");
-    volumeNode->SetScene(this->GetScene());
     volumeNode->SetDescription("Received by OpenIGTLink");
-    
-    ///double range[2];
-    vtkDebugMacro("Set basic display info");
-    
     vtkDebugMacro("Name vol node "<<volumeNode->GetClassName());
     this->GetScene()->AddNode(volumeNode);
+    vtkDebugMacro("Set basic display info");
     bool scalarDisplayNodeRequired = (numberOfComponents==1);
     vtkSmartPointer<vtkMRMLVolumeDisplayNode> displayNode;
     if (scalarDisplayNodeRequired)
@@ -252,6 +248,17 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOrAddMRMLNodeforDevice(igtlio::Device*
     
     volumeNode->SetAndObserveDisplayNodeID(displayNode->GetID());
     this->RegisterIncomingMRMLNode(volumeNode);
+#if OpenIGTLink_ENABLE_VIDEOSTREAMING
+    if(strcmp(device->GetDeviceType().c_str(), "VIDEO")==0)
+      {
+      vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::New();
+      std::string nodeName(deviceName);
+      nodeName.append("_BitStream");
+      bitStreamNode->SetName(nodeName.c_str());
+      Scene->AddNode(bitStreamNode);
+      bitStreamNode->SetUpVideoDeviceFromOutside(volumeNode->GetID(), reinterpret_cast<igtlio::VideoDevice*>(device));
+      }
+#endif
     return volumeNode;
     }
   else if(strcmp(device->GetDeviceType().c_str(),"STATUS")==0)

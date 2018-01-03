@@ -27,7 +27,7 @@
 #include "vtkMRMLIGTLQueryNode.h"
 #include "vtkMRMLIGTLStatusNode.h"
 #include "vtkMRMLIGTLSensorNode.h"
-
+#include "vtkMRMLBitStreamNode.h"
 
 // OpenIGTLinkIF Logic includes
 #include "vtkSlicerOpenIGTLinkIFLogic.h"
@@ -110,6 +110,7 @@ void vtkSlicerOpenIGTLinkIFLogic::RegisterNodes()
   scene->RegisterNodeClass(vtkNew<vtkMRMLIGTLTrackingDataBundleNode>().GetPointer());
   scene->RegisterNodeClass(vtkNew<vtkMRMLIGTLStatusNode>().GetPointer());
   scene->RegisterNodeClass(vtkNew<vtkMRMLIGTLSensorNode>().GetPointer());
+  scene->RegisterNodeClass(vtkNew<vtkMRMLBitStreamNode>().GetPointer());
 
 }
 

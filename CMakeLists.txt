@@ -22,6 +22,7 @@ include(${Slicer_USE_FILE})
 #add_definitions(-DOpenIGTLinkIF_USE_VERSION_2)
 #add_definitions(-DOpenIGTLinkIF_LIBRARY_VERSION="${OpenIGTLink_VERSION_MAJOR}-${OpenIGTLink_VERSION_MINOR}-${OpenIGTLink_VERSION_PATCH} for protocol ver. 2")
 
+set(OpenIGTLinkIO_DIR "/Users/longquanchen/Desktop/Github/OpenIGTLinkIO-xcodeBuild")
 find_package(OpenIGTLinkIO REQUIRED NO_MODULE)
 
 #-----------------------------------------------------------------------------
