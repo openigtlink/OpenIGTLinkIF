@@ -62,7 +62,7 @@ public:
   
   vtkMRMLVectorVolumeNode* GetVectorVolumeNode();
   
-  int SetUpVideoDeviceFromOutside(const char* volumeNodeID, igtlio::VideoDevice* device);
+  int ObserveOutsideVideoDevice(igtlio::VideoDevice* device);
   
   void SetUpVolumeAndVideoDeviceByName(const char* name);
   
@@ -80,9 +80,7 @@ public:
   
   void SetMessageStream(igtl::VideoMessage::Pointer buffer)
   {
-  this->MessageBuffer->SetMessageHeader(buffer);
-  this->MessageBuffer->AllocateBuffer();
-  memcpy(this->MessageBuffer->GetPackPointer(), buffer->GetPackPointer(), buffer->GetPackSize());
+  this->MessageBuffer->Copy(buffer);
   this->MessageBufferValid = true;
   };
   

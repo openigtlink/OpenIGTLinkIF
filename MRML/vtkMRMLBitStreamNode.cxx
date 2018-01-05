@@ -22,7 +22,6 @@ vtkMRMLBitStreamNode::vtkMRMLBitStreamNode()
   MessageBufferValid = false;
   ImageMessageBuffer = igtl::ImageMessage::New();
   ImageMessageBuffer->InitPack();
-  MessageBuffer->InitPack();
 }
 
 //-----------------------------------------------------------------------------
@@ -39,7 +38,10 @@ void vtkMRMLBitStreamNode::ProcessMRMLEvents( vtkObject *caller, unsigned long e
     // we are only interested in proxy node modified events
     return;
     }
-  this->SetMessageStream(modifiedDevice->GetReceivedIGTLMessage());
+  igtl::VideoMessage::Pointer videoMsg = modifiedDevice->GetReceivedIGTLMessage();
+  igtl_header* h = (igtl_header*) videoMsg->GetPackPointer();
+  igtl_header_convert_byte_order(h);
+  this->SetMessageStream(videoMsg);
   this->Modified();
 }
 
@@ -49,7 +51,7 @@ void vtkMRMLBitStreamNode::DecodeMessageStream(igtl::VideoMessage::Pointer video
     {
     SetUpVolumeAndVideoDeviceByName(videoMessage->GetDeviceName());
     }
-  if (this->videoDevice->ReceiveIGTLMessage(static_cast<igtl::MessageBase::Pointer>(videoMessage), true))
+  if (this->videoDevice->ReceiveIGTLMessage(static_cast<igtl::MessageBase::Pointer>(videoMessage), false))
     {
     this->vectorVolumeNode->Modified();
     }
@@ -64,18 +66,18 @@ void vtkMRMLBitStreamNode::SetUpVolumeAndVideoDeviceByName(const char* name)
     int nCol = collection->GetNumberOfItems();
     if (nCol > 0)
       {
-      for (int i = 0; i < nCol; i ++)
-        {
-        this->GetScene()->RemoveNode(vtkMRMLNode::SafeDownCast(collection->GetItemAsObject(i)));
-        }
+      vectorVolumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(collection->GetItemAsObject(0));
       }
-    vectorVolumeNode = vtkMRMLVectorVolumeNode::New();
-    scene->SaveStateForUndo();
-    vtkDebugMacro("Setting scene info");
-    scene->AddNode(vectorVolumeNode);
-    vectorVolumeNode->SetScene(scene);
-    vectorVolumeNode->SetDescription("Received by OpenIGTLink");
-    vectorVolumeNode->SetName(name);
+    else
+      {
+      vectorVolumeNode = vtkMRMLVectorVolumeNode::New();
+      scene->SaveStateForUndo();
+      vtkDebugMacro("Setting scene info");
+      scene->AddNode(vectorVolumeNode);
+      vectorVolumeNode->SetScene(scene);
+      vectorVolumeNode->SetDescription("Received by OpenIGTLink");
+      vectorVolumeNode->SetName(name);
+      }
     std::string nodeName(name);
     nodeName.append(SEQ_BITSTREAM_POSTFIX);
     this->SetName(nodeName.c_str());
@@ -83,28 +85,24 @@ void vtkMRMLBitStreamNode::SetUpVolumeAndVideoDeviceByName(const char* name)
     //video device initialization
     videoDevice = igtlio::VideoDevice::New();
     videoDevice->SetDeviceName(name);
+    igtlio::VideoConverter::ContentData contentdata = videoDevice->GetContent();
+    contentdata.image =  vtkSmartPointer<vtkImageData>::New();
+    videoDevice->SetContent(contentdata);
     vectorVolumeNode->SetAndObserveImageData(videoDevice->GetContent().image);
-    //videoDevice->AddObserver(videoDevice->GetDeviceContentModifiedEvent(), this, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
     //-------
     }
 }
 
-int vtkMRMLBitStreamNode::SetUpVideoDeviceFromOutside(const char* volumeNodeID, igtlio::VideoDevice* device)
+int vtkMRMLBitStreamNode::ObserveOutsideVideoDevice(igtlio::VideoDevice* device)
 {
-  vtkMRMLScene* scene = this->GetScene();
-  if(scene)
+  if (device)
     {
-    vtkMRMLNode*  node =  scene->GetNodeByID(volumeNodeID);
-    if (node && device)
-      {
-      vectorVolumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
-      device->AddObserver(device->GetDeviceContentModifiedEvent(), this, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
-      //------
-      //videoDevice = device;
-      this->SetMessageStream(device->GetReceivedIGTLMessage());
-      //-------
-      return 1;
-      }
+    //vectorVolumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
+    device->AddObserver(device->GetDeviceContentModifiedEvent(), this, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
+    //------
+    this->SetMessageStream(device->GetReceivedIGTLMessage());
+    //-------
+    return 1;
     }
   return 0;
 }

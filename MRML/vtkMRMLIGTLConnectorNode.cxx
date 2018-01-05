@@ -256,7 +256,8 @@ vtkMRMLNode* vtkMRMLIGTLConnectorNode::GetOrAddMRMLNodeforDevice(igtlio::Device*
       nodeName.append("_BitStream");
       bitStreamNode->SetName(nodeName.c_str());
       Scene->AddNode(bitStreamNode);
-      bitStreamNode->SetUpVideoDeviceFromOutside(volumeNode->GetID(), reinterpret_cast<igtlio::VideoDevice*>(device));
+      bitStreamNode->SetVectorVolumeNode(vtkMRMLVectorVolumeNode::SafeDownCast(volumeNode));
+      bitStreamNode->ObserveOutsideVideoDevice(reinterpret_cast<igtlio::VideoDevice*>(device));
       }
 #endif
     return volumeNode;
