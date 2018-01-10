@@ -26,9 +26,14 @@ if(OpenIGTLink_PROTOCOL_VERSION GREATER 1)
     vtkMRMLIGTLTrackingDataQueryNode.cxx
     vtkMRMLIGTLTrackingDataBundleNode.cxx
     vtkMRMLIGTLSensorNode.cxx
-    vtkMRMLBitStreamNode.cxx
     )
 endif()
+
+IF(OpenIGTLink_ENABLE_VIDEOSTREAMING)
+  LIST(APPEND ${KIT}_SRCS
+  vtkMRMLBitStreamNode.cxx
+  )
+ENDIF()
 
 set(${KIT}_TARGET_LIBRARIES
   ${OpenIGTLink_LIBRARIES}

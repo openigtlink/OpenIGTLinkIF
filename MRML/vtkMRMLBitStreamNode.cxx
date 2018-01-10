@@ -2,6 +2,7 @@
 #include "vtkMRMLBitStreamNode.h"
 #include "vtkXMLUtilities.h"
 #include "vtkMRMLScene.h"
+#include "vtkMRMLNRRDStorageNode.h"
 // VTK includes
 #include <vtkNew.h>
 #include <vtkCollection.h>
@@ -14,12 +15,13 @@ vtkMRMLNodeNewMacro(vtkMRMLBitStreamNode);
 //-----------------------------------------------------------------------------
 vtkMRMLBitStreamNode::vtkMRMLBitStreamNode()
 {
-  vectorVolumeNode = NULL;
   videoDevice = NULL;
-  
+  codecName = "";
   MessageBuffer = igtl::VideoMessage::New();
   MessageBuffer->InitPack();
   MessageBufferValid = false;
+  IsCopied = false;
+  isKeyFrameDecoded = false;
   ImageMessageBuffer = igtl::ImageMessage::New();
   ImageMessageBuffer->InitPack();
 }
@@ -29,66 +31,66 @@ vtkMRMLBitStreamNode::~vtkMRMLBitStreamNode()
 {
 }
 
-void vtkMRMLBitStreamNode::ProcessMRMLEvents( vtkObject *caller, unsigned long event, void *callData )
+void vtkMRMLBitStreamNode::ProcessMRMLEvents(vtkObject *caller, unsigned long event, void *callData )
 {
   this->vtkMRMLNode::ProcessMRMLEvents(caller, event, callData);
+}
+
+void vtkMRMLBitStreamNode::ProcessDeviceModifiedEvents( vtkObject *caller, unsigned long event, void *callData )
+{
   igtlio::VideoDevice* modifiedDevice = reinterpret_cast<igtlio::VideoDevice*>(caller);
   if (modifiedDevice == NULL)
     {
     // we are only interested in proxy node modified events
     return;
     }
-  igtl::VideoMessage::Pointer videoMsg = modifiedDevice->GetReceivedIGTLMessage();
+  if (event != igtlio::VideoDevice::VideoModifiedEvent)
+    {
+    return;
+    }
+  igtl::VideoMessage::Pointer videoMsg = modifiedDevice->GetCompressedIGTLMessage();
   igtl_header* h = (igtl_header*) videoMsg->GetPackPointer();
   igtl_header_convert_byte_order(h);
+  this->SetIsCopied(false);
+  this->codecName = modifiedDevice->GetCurrentCodecType();
   this->SetMessageStream(videoMsg);
   this->Modified();
 }
 
 void vtkMRMLBitStreamNode::DecodeMessageStream(igtl::VideoMessage::Pointer videoMessage)
 {
-  if(this->vectorVolumeNode == NULL || this->videoDevice == NULL)
+  if(this->videoDevice == NULL)
     {
-    SetUpVolumeAndVideoDeviceByName(videoMessage->GetDeviceName());
+    igtl::MessageHeader::Pointer headerMsg = igtl::MessageHeader::New();
+    headerMsg->Copy(videoMessage);
+    SetUpVideoDeviceByName(headerMsg->GetDeviceName());
+    }
+  if(this->GetImageData()!=this->videoDevice->GetContent().image)
+    {
+    this->SetAndObserveImageData(this->videoDevice->GetContent().image);
     }
   if (this->videoDevice->ReceiveIGTLMessage(static_cast<igtl::MessageBase::Pointer>(videoMessage), false))
     {
-    this->vectorVolumeNode->Modified();
+    this->Modified();
     }
 }
 
-void vtkMRMLBitStreamNode::SetUpVolumeAndVideoDeviceByName(const char* name)
+void vtkMRMLBitStreamNode::SetUpVideoDeviceByName(const char* name)
 {
   vtkMRMLScene* scene = this->GetScene();
   if(scene)
     {
-    vtkCollection* collection =  scene->GetNodesByClassByName("vtkMRMLVectorVolumeNode",name);
-    int nCol = collection->GetNumberOfItems();
-    if (nCol > 0)
-      {
-      vectorVolumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(collection->GetItemAsObject(0));
-      }
-    else
-      {
-      vectorVolumeNode = vtkMRMLVectorVolumeNode::New();
-      scene->SaveStateForUndo();
-      vtkDebugMacro("Setting scene info");
-      scene->AddNode(vectorVolumeNode);
-      vectorVolumeNode->SetScene(scene);
-      vectorVolumeNode->SetDescription("Received by OpenIGTLink");
-      vectorVolumeNode->SetName(name);
-      }
-    std::string nodeName(name);
-    nodeName.append(SEQ_BITSTREAM_POSTFIX);
-    this->SetName(nodeName.c_str());
+    this->SetDescription("Received by OpenIGTLink");
+    if (!(strcmp(name,"") == 0))
+      this->SetName(name);
     //------
     //video device initialization
     videoDevice = igtlio::VideoDevice::New();
-    videoDevice->SetDeviceName(name);
+    videoDevice->SetDeviceName(this->GetName());
     igtlio::VideoConverter::ContentData contentdata = videoDevice->GetContent();
     contentdata.image =  vtkSmartPointer<vtkImageData>::New();
     videoDevice->SetContent(contentdata);
-    vectorVolumeNode->SetAndObserveImageData(videoDevice->GetContent().image);
+    this->SetAndObserveImageData(videoDevice->GetContent().image);
     //-------
     }
 }
@@ -98,26 +100,19 @@ int vtkMRMLBitStreamNode::ObserveOutsideVideoDevice(igtlio::VideoDevice* device)
   if (device)
     {
     //vectorVolumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(node);
-    device->AddObserver(device->GetDeviceContentModifiedEvent(), this, &vtkMRMLBitStreamNode::ProcessMRMLEvents);
+    device->AddObserver(device->GetDeviceContentModifiedEvent(), this, &vtkMRMLBitStreamNode::ProcessDeviceModifiedEvents);
     //------
-    this->SetMessageStream(device->GetReceivedIGTLMessage());
+    igtl::VideoMessage::Pointer videoMsg = device->GetCompressedIGTLMessage();
+    igtl_header* h = (igtl_header*) videoMsg->GetPackPointer();
+    igtl_header_convert_byte_order(h);
+    this->SetMessageStream(videoMsg);
+    this->codecName = device->GetCurrentCodecType();
+    this->SetAndObserveImageData(device->GetContent().image);
     //-------
     return 1;
     }
   return 0;
 }
-
-
-void vtkMRMLBitStreamNode::SetVectorVolumeNode(vtkMRMLVectorVolumeNode* volumeNode)
-{
-  this->vectorVolumeNode = vtkMRMLVectorVolumeNode::SafeDownCast(volumeNode);
-}
-
-vtkMRMLVectorVolumeNode* vtkMRMLBitStreamNode::GetVectorVolumeNode()
-{
-  return this->vectorVolumeNode;
-}
-
 
 //----------------------------------------------------------------------------
 void vtkMRMLBitStreamNode::WriteXML(ostream& of, int nIndent)
@@ -149,3 +144,10 @@ void vtkMRMLBitStreamNode::PrintSelf(ostream& os, vtkIndent indent)
 {
   Superclass::PrintSelf(os,indent);
 }
+
+//----------------------------------------------------------------------------
+vtkMRMLStorageNode* vtkMRMLBitStreamNode::CreateDefaultStorageNode()
+{
+  return vtkMRMLNRRDStorageNode::New();
+}
+

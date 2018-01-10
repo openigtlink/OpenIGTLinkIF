@@ -22,23 +22,27 @@
 #include <vtkImageData.h>
 #include <vtkObject.h>
 
-static std::string SEQ_BITSTREAM_POSTFIX = "_BitStream";
+//static std::string SEQ_BITSTREAM_POSTFIX = "_BitStream";
 
-class  VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLBitStreamNode : public vtkMRMLNode
+class  VTK_SLICER_OPENIGTLINKIF_MODULE_MRML_EXPORT vtkMRMLBitStreamNode : public vtkMRMLVectorVolumeNode
 {
 public:
   
   static vtkMRMLBitStreamNode *New();
-  vtkTypeMacro(vtkMRMLBitStreamNode,vtkMRMLNode);
+  vtkTypeMacro(vtkMRMLBitStreamNode,vtkMRMLVectorVolumeNode);
   void PrintSelf(ostream& os, vtkIndent indent);
   
   virtual vtkMRMLNode* CreateNodeInstance();
   
   virtual void ProcessMRMLEvents( vtkObject *caller, unsigned long event, void *callData );
   
+  void ProcessDeviceModifiedEvents( vtkObject *caller, unsigned long event, void *callData );
   ///
   /// Set node attributes
   virtual void ReadXMLAttributes( const char** atts);
+  
+  /// Create default storage node or NULL if does not have one
+  virtual vtkMRMLStorageNode* CreateDefaultStorageNode() VTK_OVERRIDE;
   
   ///
   /// Write this node's information to a MRML file in XML format.
@@ -52,19 +56,19 @@ public:
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName() {return "BitStream";};
   
-  
-  void SetVectorVolumeNode(vtkMRMLVectorVolumeNode* imageData);
-  
   void SetVideoMessageDevice(igtlio::VideoDevice* inDevice)
   {
   this->videoDevice = inDevice;
   };
   
-  vtkMRMLVectorVolumeNode* GetVectorVolumeNode();
+  igtlio::VideoDevice* GetVideoMessageDevice()
+  {
+  return this->videoDevice;
+  }
   
   int ObserveOutsideVideoDevice(igtlio::VideoDevice* device);
   
-  void SetUpVolumeAndVideoDeviceByName(const char* name);
+  void SetUpVideoDeviceByName(const char* name);
   
   void DecodeMessageStream(igtl::VideoMessage::Pointer videoMessage);
   
@@ -89,6 +93,9 @@ public:
   return MessageBuffer;
   };
   
+  vtkSetMacro(IsCopied, bool);
+  vtkGetMacro(IsCopied, bool);
+  
   igtl::ImageMessage::Pointer GetImageMessageBuffer()
   {
   return ImageMessageBuffer;
@@ -100,16 +107,18 @@ public:
   ;
   };
   
-  void SetVectorVolumeName(const char* name)
-  {
-  this->vectorVolumeNode->SetName(name);
-  };
-  
-  
   bool GetMessageValid()
   {
   return MessageBufferValid;
   };
+  
+  /// Return a default file extension for writting
+  //virtual const char* GetDefaultWriteFileExtension();
+  
+  std::string GetCodecName(){return this->codecName;};
+  
+  void SetCodecName(std::string name){ this->codecName=name;};
+  
   
 protected:
   vtkMRMLBitStreamNode();
@@ -117,7 +126,6 @@ protected:
   vtkMRMLBitStreamNode(const vtkMRMLBitStreamNode&);
   void operator=(const vtkMRMLBitStreamNode&);
   
-  vtkMRMLVectorVolumeNode * vectorVolumeNode;
   igtl::VideoMessage::Pointer MessageBuffer;
   igtl::ImageMessage::Pointer ImageMessageBuffer;
   bool MessageBufferValid;
@@ -126,6 +134,9 @@ protected:
   
   bool isKeyFrameDecoded;
   
+  bool IsCopied;
+  
+  std::string codecName;
 };
 
 #endif
