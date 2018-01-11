@@ -20,8 +20,12 @@ vtkMRMLBitStreamNode::vtkMRMLBitStreamNode()
   MessageBuffer = igtl::VideoMessage::New();
   MessageBuffer->InitPack();
   MessageBufferValid = false;
+  KeyFrameBuffer = igtl::VideoMessage::New();
+  KeyFrameBuffer->InitPack();
   IsCopied = false;
+  isKeyFrameReceived = false;
   isKeyFrameDecoded = false;
+  isKeyFrameUpdated = false;
   ImageMessageBuffer = igtl::ImageMessage::New();
   ImageMessageBuffer->InitPack();
 }
@@ -52,8 +56,18 @@ void vtkMRMLBitStreamNode::ProcessDeviceModifiedEvents( vtkObject *caller, unsig
   igtl_header* h = (igtl_header*) videoMsg->GetPackPointer();
   igtl_header_convert_byte_order(h);
   this->SetIsCopied(false);
+  this->SetKeyFrameUpdated(false);
   this->codecName = modifiedDevice->GetCurrentCodecType();
   this->SetMessageStream(videoMsg);
+  if(!this->GetKeyFrameReceivedFlag() || modifiedDevice->GetContent().keyFrameUpdated)
+    {
+    igtl::VideoMessage::Pointer keyFrameMsg = modifiedDevice->GetKeyFrameMessage();
+    igtl_header* h = (igtl_header*) keyFrameMsg->GetPackPointer();
+    igtl_header_convert_byte_order(h);
+    this->SetKeyFrameStream(keyFrameMsg);
+    this->SetKeyFrameReceivedFlag(true);
+    this->SetKeyFrameUpdated(true);
+    }
   this->Modified();
 }
 

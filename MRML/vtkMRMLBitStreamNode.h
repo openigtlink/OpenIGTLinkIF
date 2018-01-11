@@ -72,12 +72,32 @@ public:
   
   void DecodeMessageStream(igtl::VideoMessage::Pointer videoMessage);
   
-  void SetKeyFrameDecodedFlag(bool flag)
+  void SetKeyFrameReceivedFlag(bool flag)
+  {
+  this->isKeyFrameReceived = flag;
+  };
+  
+  bool GetKeyFrameReceivedFlag()
+  {
+  return this->isKeyFrameReceived;
+  };
+  
+  void SetKeyFrameUpdated(bool flag)
+  {
+  this->isKeyFrameUpdated = flag;
+  };
+  
+  bool GetKeyFrameUpdated()
+  {
+  return this->isKeyFrameUpdated;
+  };
+  
+  void SetKeyFrameDecoded(bool flag)
   {
   this->isKeyFrameDecoded = flag;
   };
   
-  bool GetKeyFrameDecodedFlag()
+  bool GetKeyFrameDecoded()
   {
   return this->isKeyFrameDecoded;
   };
@@ -93,7 +113,17 @@ public:
   return MessageBuffer;
   };
   
-  vtkSetMacro(IsCopied, bool);
+  void SetKeyFrameStream(igtl::VideoMessage::Pointer buffer)
+  {
+  this->KeyFrameBuffer->Copy(buffer);
+  };
+  
+  igtl::VideoMessage::Pointer GetKeyFrameStream()
+  {
+  return KeyFrameBuffer;
+  };
+  
+  void SetIsCopied(bool copied){this->IsCopied = copied;};
   vtkGetMacro(IsCopied, bool);
   
   igtl::ImageMessage::Pointer GetImageMessageBuffer()
@@ -127,10 +157,15 @@ protected:
   void operator=(const vtkMRMLBitStreamNode&);
   
   igtl::VideoMessage::Pointer MessageBuffer;
+  igtl::VideoMessage::Pointer KeyFrameBuffer;
   igtl::ImageMessage::Pointer ImageMessageBuffer;
   bool MessageBufferValid;
   
   igtlio::VideoDevice* videoDevice;
+  
+  bool isKeyFrameReceived;
+  
+  bool isKeyFrameUpdated;
   
   bool isKeyFrameDecoded;
   
