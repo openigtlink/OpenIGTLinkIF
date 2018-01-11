@@ -110,7 +110,9 @@ public:
   
   igtl::VideoMessage::Pointer GetMessageStreamBuffer()
   {
-  return MessageBuffer;
+  igtl::VideoMessage::Pointer returnMSG = igtl::VideoMessage::New();
+  returnMSG->Copy(this->MessageBuffer);
+  return returnMSG;
   };
   
   void SetKeyFrameStream(igtl::VideoMessage::Pointer buffer)
@@ -120,7 +122,9 @@ public:
   
   igtl::VideoMessage::Pointer GetKeyFrameStream()
   {
-  return KeyFrameBuffer;
+  igtl::VideoMessage::Pointer returnMSG = igtl::VideoMessage::New();
+  returnMSG->Copy(this->KeyFrameBuffer);
+  return returnMSG;
   };
   
   void SetIsCopied(bool copied){this->IsCopied = copied;};

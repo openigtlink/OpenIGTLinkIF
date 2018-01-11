@@ -375,13 +375,7 @@ void vtkMRMLIGTLConnectorNode::ProcessIncomingDeviceModifiedEvent(vtkObject *cal
 #if OpenIGTLink_ENABLE_VIDEOSTREAMING
     else if (strcmp(deviceType.c_str(), "VIDEO")==0)
       {
-      igtlio::VideoDevice* videoDevice = reinterpret_cast<igtlio::VideoDevice*>(modifiedDevice);
-      if (strcmp(modifiedNode->GetName(), deviceName.c_str()) == 0)
-        {
-        vtkMRMLBitStreamNode* bitStreamNode = vtkMRMLBitStreamNode::SafeDownCast(modifiedNode);
-        bitStreamNode->SetAndObserveImageData(videoDevice->GetContent().image);
-        bitStreamNode->Modified();
-        }
+      // The BitstreamNode has its own handling of the device modified event
       }
 #endif
     else if (strcmp(deviceType.c_str(), "STATUS") == 0)
