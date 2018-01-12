@@ -14,6 +14,16 @@ else()
   include(${Slicer_USE_FILE})
 endif()
 
+#-----------------------------------------------------------------------------
+# OpenIGTlinkIF version number.
+SET(OpenIGTLinkIF_VERSION_MAJOR "1")
+SET(OpenIGTLinkIF_VERSION_MINOR "0")
+SET(OpenIGTLinkIF_VERSION_PATCH "0")
+
+if(NOT ("3.0.0" VERSION_EQUAL "${OpenIGTLink_VERSION_MAJOR}.${OpenIGTLink_VERSION_MINOR}.${OpenIGTLink_VERSION_PATCH}"))
+    message(FATAL_ERROR "Version of OpenIGTLink should be 3.0.0.")
+endif()
+
 # --------------------------------------------------------------------------
 # Check if version 2 protocol is available
 # Features that depnd on OpenIGTLink Protocol 2 are only available
