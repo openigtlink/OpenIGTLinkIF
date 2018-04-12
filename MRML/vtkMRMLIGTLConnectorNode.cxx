@@ -1262,11 +1262,10 @@ void vtkMRMLIGTLConnectorNode::ImportEventsFromEventBuffer()
       eventId=this->EventQueue.front();
       this->EventQueue.pop_front();
       emptyQueue=false;
+      // Invoke the event
+      this->InvokeEvent(eventId);
     }
     this->EventQueueMutex->Unlock();
-
-    // Invoke the event
-    this->InvokeEvent(eventId);
 
   } while (!emptyQueue);
 
